@@ -893,12 +893,12 @@ extension GameTuningConfig {
                         policyRateDelta: -0.01,
                         credibilityDelta: -0.010,
                         publicApprovalDelta: 3.0,
-                        politicalPressureDelta: -8.0,
+                        politicalPressureDelta: -8.0
                     ),
                     rejectEffects: ConfiguredEffectBundle(
                         credibilityDelta: 0.008,
                         publicApprovalDelta: -2.0,
-                        politicalPressureDelta: 8.0,
+                        politicalPressureDelta: 8.0
                     )),
                 "tightenControls": CabinetRequestConfig(
                     detail: "Ministers want tighter capital controls to slow reserve losses and show crisis management.",
@@ -908,7 +908,7 @@ extension GameTuningConfig {
                         capitalAccountGDPDelta: 0.008,
                         credibilityDelta: -0.010,
                         publicApprovalDelta: -2.0,
-                        politicalPressureDelta: -4.0,
+                        politicalPressureDelta: -4.0
                     ),
                     rejectEffects: ConfiguredEffectBundle(
                         credibilityDelta: 0.005,
@@ -925,12 +925,12 @@ extension GameTuningConfig {
                         fxInterventionMonths: -0.50,
                         credibilityDelta: 0.005,
                         publicApprovalDelta: 1.0,
-                        politicalPressureDelta: -5.0,
+                        politicalPressureDelta: -5.0
                     ),
                     rejectEffects: ConfiguredEffectBundle(
                         credibilityDelta: -0.005,
                         publicApprovalDelta: -3.0,
-                        politicalPressureDelta: 6.0,
+                        politicalPressureDelta: 6.0
                     ))
             ]),
         crisis: CrisisConfig(
@@ -992,7 +992,7 @@ extension GameTuningConfig {
                         outputGapDelta: 0.025,
                         publicApprovalDelta: 4.0,
                         politicalPressureDelta: -5.0,
-                        inflationDelta: 0.004,
+                        inflationDelta: 0.004
                     ),
                     newsLine: "CRISIS MEASURE: Emergency liquidity window opened. Credit panic slows, but inflation risk rises.",
                     resultMessage: "Emergency liquidity opened. Recession pressure eases now, but inflation and credibility worsen.")

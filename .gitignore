@@ -79,7 +79,8 @@ Package.resolved
 .swiftpm
 
 .build/
-dist/
+dist/*
+!dist/.gitkeep
 
 # Local build/test artifacts
 .build-cache/
