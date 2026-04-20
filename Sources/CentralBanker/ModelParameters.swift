@@ -33,7 +33,7 @@ struct ModelParameters {
     // ─── Output gap (IS dynamics) ───────────────────────────────────────────
     struct OutputGap {
         var potentialGrowthAnnual: Double = 0.035
-        var neutralRealRate: Double = 0.030
+        var neutralRealRate: Double = 0.020
         var persistence: Double = 0.72            // autoregressive coefficient
         var isCoefficient: Double = 0.45          // annualised; divided by 4 in-model
         var creditImpulse: Double = 0.10
@@ -41,6 +41,11 @@ struct ModelParameters {
         var externalDemand: Double = 0.14
         var partnerQuarterlyBaseline: Double = 0.01
         var currentAccountSupport: Double = 0.08
+        // Reserve requirements are a supporting tool: they can cool domestic
+        // credit and imports, but if pushed too high they start choking the
+        // banking system and weigh on activity directly.
+        var reserveRequirementDragThreshold: Double = 0.16
+        var reserveRequirementDemandDrag: Double = 0.05
         // Heavy, sustained capital controls distort investment and trade
         // finance. Below the threshold they are mostly a crisis-management
         // tool; above it they start shaving cyclical demand and trend growth.
@@ -55,7 +60,7 @@ struct ModelParameters {
     // ─── Inflation (Phillips curve) ─────────────────────────────────────────
     struct Inflation {
         var phillipsSlope: Double = 0.26          // annualised; divided by 4 in-model
-        var exchangeRatePassthrough: Double = -0.10
+        var exchangeRatePassthrough: Double = 0.03
         var supplyNoiseCarry: Double = 0.45
         var supplyNoiseStd: Double = 0.004
         var bounds: ClosedRange<Double> = -0.02 ... 0.65
@@ -116,6 +121,7 @@ struct ModelParameters {
         var absorption: Double = -0.28
         var partnerSensitivity: Double = 0.14
         var partnerBaseline: Double = 0.030
+        var reserveDemandCompression: Double = 0.10
         var persistence: Double = 0.82
         var bounds: ClosedRange<Double> = -0.18 ... 0.12
     }
@@ -124,6 +130,7 @@ struct ModelParameters {
     struct CapitalAccount {
         var interestSensitivity: Double = 0.45
         var expectationsSensitivity: Double = -0.55
+        var reserveStabilitySupport: Double = 0.10
         // Beyond a moderate threshold, controls deter legitimate inflows as
         // well as panic outflows, making them weaker as a permanent setting.
         var controlsPenaltyThreshold: Double = 0.45

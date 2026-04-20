@@ -147,6 +147,12 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(options.bot, .glonzo)
     }
 
+    func testCLIParsesValidationFlag() throws {
+        let options = try parseCLIArgs(["CentralBanker", "--validate-model", "--bot", "full_reactive"])
+        XCTAssertTrue(options.validateModel)
+        XCTAssertEqual(options.bot, .fullReactive)
+    }
+
     // The whole point of moving parsing to a pure throwing function is that
     // invalid input can be asserted on directly — no stdio mocking, no
     // process-exit side effect. These pin that contract.
@@ -217,6 +223,61 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(shortIDs.contains("confidence_rebuild_1998"))
         XCTAssertTrue(extendedIDs.contains("bretton_break_1971"))
         XCTAssertTrue(extendedIDs.contains("lost_decade_recovery_1985"))
+    }
+
+    func testValidationFindingsFlagObviousReserveRunInversion() {
+        let passive = ValidationSummary(
+            profileID: "reserve_run",
+            profileTitle: "Reserve Run",
+            gameLength: .short,
+            mode: .randomized,
+            horizonQuarters: 6,
+            difficulty: .governor,
+            bot: .passive,
+            runs: 10,
+            survivalRate: 0.60,
+            medianScore: 35,
+            averageQuartersSimulated: 6.0,
+            averageFinalInflation: 0.11,
+            averageFinalOutputGap: -0.01,
+            averageFinalReserves: 1.5,
+            averageFinalCredibility: 0.48,
+            averageFinalApproval: 40.0,
+            averageFinalExternalDebt: 0.70,
+            averageFinalExchangeRateChange: 0.05,
+            averagePeakInflation: 0.13,
+            averageLowestReserves: 1.2,
+            outcomeCounts: ["Currency": 3, "Ongoing": 7]
+        )
+        let reactive = ValidationSummary(
+            profileID: "reserve_run",
+            profileTitle: "Reserve Run",
+            gameLength: .short,
+            mode: .randomized,
+            horizonQuarters: 6,
+            difficulty: .governor,
+            bot: .fullReactive,
+            runs: 10,
+            survivalRate: 0.40,
+            medianScore: 28,
+            averageQuartersSimulated: 6.0,
+            averageFinalInflation: 0.10,
+            averageFinalOutputGap: -0.015,
+            averageFinalReserves: 1.3,
+            averageFinalCredibility: 0.46,
+            averageFinalApproval: 38.0,
+            averageFinalExternalDebt: 0.72,
+            averageFinalExchangeRateChange: 0.06,
+            averagePeakInflation: 0.12,
+            averageLowestReserves: 1.1,
+            outcomeCounts: ["Currency": 4, "Ongoing": 6]
+        )
+
+        let findings = validationFindings(from: [passive, reactive])
+        XCTAssertFalse(findings.isEmpty)
+        XCTAssertTrue(findings.contains {
+            $0.profileID == "reserve_run" && $0.headline.contains("Reserve-defense toolkit")
+        })
     }
 
     func testScenarioCompletionAndGoalEvaluation() {
@@ -718,6 +779,24 @@ final class EconomyTests: XCTestCase {
                           "Rate-hike effect on output gap is smaller than expected (<0.5pp).")
     }
 
+    func testHigherReserveRequirementSupportsExternalPositionButCostsGrowth() {
+        let baseline = EconomicSimulator(seed: testSeed)
+        let tightReserve = EconomicSimulator(seed: testSeed)
+        tightReserve.state.reserveRequirement = 0.20
+
+        for _ in 0..<6 {
+            stepQuarter(baseline)
+            stepQuarter(tightReserve)
+        }
+
+        XCTAssertLessThan(tightReserve.state.annualizedGDPGrowth, baseline.state.annualizedGDPGrowth,
+                          "Higher reserve requirements should cool activity, not behave like a free lunch.")
+        XCTAssertGreaterThan(tightReserve.state.currentAccountGDP, baseline.state.currentAccountGDP,
+                             "Higher reserve requirements should modestly compress demand and help the current account.")
+        XCTAssertGreaterThan(tightReserve.state.capitalAccountGDP, baseline.state.capitalAccountGDP,
+                             "Higher reserve requirements should offer some financial-stability support to the capital account.")
+    }
+
     // MARK: - 4. Oil shock raises inflation
 
     func testOilShockRaisesInflationRelativeToBaseline() {
@@ -743,6 +822,18 @@ final class EconomyTests: XCTestCase {
         // And the shock should register as stagflationary — output gap lower.
         XCTAssertLessThan(shocked.state.outputGap, calm.state.outputGap,
                           "Oil shock should also depress the output gap.")
+    }
+
+    func testLaggedDepreciationRaisesInflationRelativeToBaseline() {
+        let calm = EconomicSimulator(seed: testSeed)
+        let weakCurrency = EconomicSimulator(seed: testSeed)
+        weakCurrency.state.exchangeRateQoQChange = 0.10
+
+        stepQuarter(calm)
+        stepQuarter(weakCurrency)
+
+        XCTAssertGreaterThan(weakCurrency.state.inflation, calm.state.inflation,
+                             "Lagged currency depreciation should feed into higher inflation, not lower.")
     }
 
     // MARK: - 4b. Current-account persistence actually mean-reverts

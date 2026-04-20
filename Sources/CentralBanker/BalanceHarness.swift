@@ -744,6 +744,645 @@ private func writeBalanceReport(_ summaries: [BalanceSummary],
     try data.write(to: url, options: .atomic)
 }
 
+struct ValidationSummary: Codable {
+    var profileID: String
+    var profileTitle: String
+    var gameLength: GameLength
+    var mode: GameMode
+    var horizonQuarters: Int
+    var difficulty: Difficulty
+    var bot: BalanceBot
+    var runs: Int
+    var survivalRate: Double
+    var medianScore: Int
+    var averageQuartersSimulated: Double
+    var averageFinalInflation: Double
+    var averageFinalOutputGap: Double
+    var averageFinalReserves: Double
+    var averageFinalCredibility: Double
+    var averageFinalApproval: Double
+    var averageFinalExternalDebt: Double
+    var averageFinalExchangeRateChange: Double
+    var averagePeakInflation: Double
+    var averageLowestReserves: Double
+    var outcomeCounts: [String: Int]
+}
+
+struct ValidationFinding: Codable {
+    var profileID: String
+    var difficulty: Difficulty?
+    var headline: String
+    var detail: String
+}
+
+private struct ValidationRunResult {
+    var profileID: String
+    var profileTitle: String
+    var gameLength: GameLength
+    var mode: GameMode
+    var horizonQuarters: Int
+    var difficulty: Difficulty
+    var bot: BalanceBot
+    var outcome: GameOutcome
+    var score: Int
+    var quartersSimulated: Int
+    var finalInflation: Double
+    var finalOutputGap: Double
+    var finalReserves: Double
+    var finalCredibility: Double
+    var finalApproval: Double
+    var finalExternalDebt: Double
+    var finalExchangeRateChange: Double
+    var peakInflation: Double
+    var lowestReserves: Double
+}
+
+private struct ValidationProfile {
+    let id: String
+    let title: String
+    let gameLength: GameLength
+    let mode: GameMode
+    let horizonQuarters: Int
+    let apply: (inout EconomicState, inout ExternalEnvironment) -> Void
+}
+
+private struct ValidationReport: Codable {
+    let generatedAt: String
+    let runsPerCell: Int
+    let baseSeed: UInt64
+    let summaries: [ValidationSummary]
+    let findings: [ValidationFinding]
+}
+
+func runValidationHarness(_ config: BalanceConfig) {
+    let profiles = validationProfiles().filter {
+        config.lengths.contains($0.gameLength) && config.modes.contains($0.mode)
+    }
+    guard !profiles.isEmpty else {
+        print("Model validation harness")
+        print("  No validation profiles matched the requested length/mode filters.")
+        return
+    }
+
+    print("Model validation harness")
+    print("  Runs per cell: \(config.runsPerCell)")
+    print("  Base seed: \(config.baseSeed)")
+    print("  Profiles: \(profiles.count)")
+    print("")
+
+    var summaries: [ValidationSummary] = []
+    for profile in profiles {
+        for difficulty in config.difficulties {
+            for bot in config.bots {
+                var runs: [ValidationRunResult] = []
+                for i in 0..<config.runsPerCell {
+                    let seed = config.baseSeed &+ UInt64(i)
+                    runs.append(runValidationProfile(profile, difficulty: difficulty, bot: bot, seed: seed))
+                }
+                summaries.append(summarizeValidationRuns(runs))
+            }
+        }
+    }
+
+    let findings = validationFindings(from: summaries)
+    printValidationSummaries(summaries)
+    printValidationFindings(findings)
+    if let path = config.reportPath {
+        do {
+            try writeValidationReport(summaries, findings: findings, config: config, to: path)
+            print("")
+            print("Wrote validation report to \(resolvedSavePath(path))")
+        } catch {
+            print("")
+            print("Failed to write validation report: \(error)")
+        }
+    }
+}
+
+private func runValidationProfile(_ profile: ValidationProfile,
+                                  difficulty: Difficulty,
+                                  bot: BalanceBot,
+                                  seed: UInt64) -> ValidationRunResult {
+    let session = GameSession(
+        mode: profile.mode,
+        gameLength: profile.gameLength,
+        difficulty: difficulty,
+        scenarioID: nil,
+        sessionSeed: seed)
+
+    profile.apply(&session.simulator.state, &session.simulator.environment)
+
+    var outcome: GameOutcome = .ongoing
+    for _ in 0..<profile.horizonQuarters {
+        _ = applyBalanceBotTurn(bot, to: session.simulator)
+        outcome = session.advance()
+        if outcome != .ongoing { break }
+    }
+
+    let currentOutcome = outcome == .ongoing ? session.currentOutcome() : outcome
+    let score = computeScore(
+        outcome: currentOutcome,
+        card: session.simulator.scoreCard,
+        gameLength: profile.gameLength
+    ).final
+
+    return ValidationRunResult(
+        profileID: profile.id,
+        profileTitle: profile.title,
+        gameLength: profile.gameLength,
+        mode: profile.mode,
+        horizonQuarters: profile.horizonQuarters,
+        difficulty: difficulty,
+        bot: bot,
+        outcome: currentOutcome,
+        score: score,
+        quartersSimulated: session.simulator.scoreCard.quartersSimulated,
+        finalInflation: session.simulator.state.inflation,
+        finalOutputGap: session.simulator.state.outputGap,
+        finalReserves: session.simulator.state.foreignReservesMonths,
+        finalCredibility: session.simulator.state.credibility,
+        finalApproval: session.simulator.state.publicApproval,
+        finalExternalDebt: session.simulator.state.externalDebtGDP,
+        finalExchangeRateChange: session.simulator.state.exchangeRateQoQChange,
+        peakInflation: session.simulator.scoreCard.peakInflation,
+        lowestReserves: session.simulator.scoreCard.lowestReserves
+    )
+}
+
+private func summarizeValidationRuns(_ runs: [ValidationRunResult]) -> ValidationSummary {
+    precondition(!runs.isEmpty)
+    let totalRuns = runs.count
+    let scores = runs.map(\.score).sorted()
+    let survivalCount = runs.filter { $0.outcome == .success || $0.outcome == .ongoing }.count
+    var outcomeCounts: [GameOutcome: Int] = [:]
+    for run in runs {
+        outcomeCounts[run.outcome, default: 0] += 1
+    }
+
+    return ValidationSummary(
+        profileID: runs[0].profileID,
+        profileTitle: runs[0].profileTitle,
+        gameLength: runs[0].gameLength,
+        mode: runs[0].mode,
+        horizonQuarters: runs[0].horizonQuarters,
+        difficulty: runs[0].difficulty,
+        bot: runs[0].bot,
+        runs: totalRuns,
+        survivalRate: Double(survivalCount) / Double(totalRuns),
+        medianScore: percentile(scores, 0.50),
+        averageQuartersSimulated: Double(runs.map(\.quartersSimulated).reduce(0, +)) / Double(totalRuns),
+        averageFinalInflation: runs.map(\.finalInflation).reduce(0, +) / Double(totalRuns),
+        averageFinalOutputGap: runs.map(\.finalOutputGap).reduce(0, +) / Double(totalRuns),
+        averageFinalReserves: runs.map(\.finalReserves).reduce(0, +) / Double(totalRuns),
+        averageFinalCredibility: runs.map(\.finalCredibility).reduce(0, +) / Double(totalRuns),
+        averageFinalApproval: runs.map(\.finalApproval).reduce(0, +) / Double(totalRuns),
+        averageFinalExternalDebt: runs.map(\.finalExternalDebt).reduce(0, +) / Double(totalRuns),
+        averageFinalExchangeRateChange: runs.map(\.finalExchangeRateChange).reduce(0, +) / Double(totalRuns),
+        averagePeakInflation: runs.map(\.peakInflation).reduce(0, +) / Double(totalRuns),
+        averageLowestReserves: runs.map(\.lowestReserves).reduce(0, +) / Double(totalRuns),
+        outcomeCounts: outcomeCounts.reduce(into: [:]) { partial, item in
+            partial[item.key.label] = item.value
+        }
+    )
+}
+
+func validationFindings(from summaries: [ValidationSummary]) -> [ValidationFinding] {
+    struct Key: Hashable {
+        let profileID: String
+        let difficulty: Difficulty
+        let bot: BalanceBot
+    }
+
+    let summaryByKey = Dictionary(uniqueKeysWithValues: summaries.map {
+        (Key(profileID: $0.profileID, difficulty: $0.difficulty, bot: $0.bot), $0)
+    })
+
+    func summary(_ profileID: String, _ difficulty: Difficulty, _ bot: BalanceBot) -> ValidationSummary? {
+        summaryByKey[Key(profileID: profileID, difficulty: difficulty, bot: bot)]
+    }
+
+    func outcomeCount(_ summary: ValidationSummary?, _ label: String) -> Int {
+        summary?.outcomeCounts[label] ?? 0
+    }
+
+    var findings: [ValidationFinding] = []
+
+    for difficulty in Difficulty.allCases {
+        if let passive = summary("overheating_credit_boom", difficulty, .passive),
+           let rateOnly = summary("overheating_credit_boom", difficulty, .rateOnly),
+           let reactive = summary("overheating_credit_boom", difficulty, .fullReactive),
+           let glonzo = summary("overheating_credit_boom", difficulty, .glonzo) {
+            if rateOnly.averageFinalInflation >= passive.averageFinalInflation - 0.002 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Tightening is not cooling an overheated economy",
+                    detail: "RateOnly finished with average inflation \(pct(rateOnly.averageFinalInflation)), versus passive \(pct(passive.averageFinalInflation)). That suggests policy tightening is not reliably reducing inflation in the overheating profile."
+                ))
+            }
+            if reactive.averageFinalInflation >= passive.averageFinalInflation - 0.005 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Full toolkit is not materially better than passive in an overheating boom",
+                    detail: "FullReactive ended with average inflation \(pct(reactive.averageFinalInflation)) versus passive \(pct(passive.averageFinalInflation)). Expected gap is missing."
+                ))
+            }
+            if glonzo.medianScore >= reactive.medianScore {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Random flailing is scoring as well as deliberate policy in overheating conditions",
+                    detail: "Glonzo median score \(glonzo.medianScore) is not below FullReactive \(reactive.medianScore)."
+                ))
+            }
+        }
+
+        if let passive = summary("reserve_run", difficulty, .passive),
+           let reactive = summary("reserve_run", difficulty, .fullReactive) {
+            if reactive.survivalRate <= passive.survivalRate {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Reserve-defense toolkit is not improving survival under a run",
+                    detail: "FullReactive survival \(pct(reactive.survivalRate)) versus passive \(pct(passive.survivalRate))."
+                ))
+            }
+            if reactive.averageLowestReserves <= passive.averageLowestReserves + 0.10 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Reserve-defense actions are not preserving reserves in a reserve run",
+                    detail: "FullReactive average reserve trough \(months(reactive.averageLowestReserves)) versus passive \(months(passive.averageLowestReserves))."
+                ))
+            }
+            if outcomeCount(reactive, "Currency") >= outcomeCount(passive, "Currency") {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Currency crises are not falling under active reserve defense",
+                    detail: "FullReactive currency-crisis count \(outcomeCount(reactive, "Currency")) versus passive \(outcomeCount(passive, "Currency"))."
+                ))
+            }
+        }
+
+        if let passive = summary("deep_recession", difficulty, .passive),
+           let rateOnly = summary("deep_recession", difficulty, .rateOnly),
+           let reactive = summary("deep_recession", difficulty, .fullReactive),
+           let glonzo = summary("deep_recession", difficulty, .glonzo) {
+            if reactive.averageFinalOutputGap <= rateOnly.averageFinalOutputGap + 0.003 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "FullReactive is not supporting recovery better than rate-only policy",
+                    detail: "FullReactive average output gap \(pctSigned(reactive.averageFinalOutputGap)) versus RateOnly \(pctSigned(rateOnly.averageFinalOutputGap))."
+                ))
+            }
+            if reactive.averageFinalApproval <= passive.averageFinalApproval {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Active recession management is not improving political outcomes",
+                    detail: "FullReactive average approval \(String(format: "%.1f", reactive.averageFinalApproval)) versus passive \(String(format: "%.1f", passive.averageFinalApproval))."
+                ))
+            }
+            if glonzo.medianScore >= reactive.medianScore {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Random policy is performing too well in recession management",
+                    detail: "Glonzo median score \(glonzo.medianScore) versus FullReactive \(reactive.medianScore)."
+                ))
+            }
+        }
+
+        if let passive = summary("debt_overhang", difficulty, .passive),
+           let reactive = summary("debt_overhang", difficulty, .fullReactive),
+           let glonzo = summary("debt_overhang", difficulty, .glonzo) {
+            if reactive.averageFinalExternalDebt >= passive.averageFinalExternalDebt - 0.005 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Active management is not reducing debt overhang relative to passive play",
+                    detail: "FullReactive average external debt \(pct(reactive.averageFinalExternalDebt)) versus passive \(pct(passive.averageFinalExternalDebt))."
+                ))
+            }
+            if reactive.averageFinalReserves <= passive.averageFinalReserves + 0.10 {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Debt-overhang management is not stabilizing reserves",
+                    detail: "FullReactive average final reserves \(months(reactive.averageFinalReserves)) versus passive \(months(passive.averageFinalReserves))."
+                ))
+            }
+            if glonzo.medianScore >= reactive.medianScore {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Glonzo is competing with deliberate policy in debt-overhang conditions",
+                    detail: "Glonzo median score \(glonzo.medianScore) versus FullReactive \(reactive.medianScore)."
+                ))
+            }
+        }
+
+        if let passive = summary("capital_lockdown", difficulty, .passive),
+           let reactive = summary("capital_lockdown", difficulty, .fullReactive) {
+            if reactive.averageFinalCredibility <= passive.averageFinalCredibility {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Unwinding heavy controls is not restoring credibility",
+                    detail: "FullReactive average credibility \(pct(reactive.averageFinalCredibility)) versus passive \(pct(passive.averageFinalCredibility))."
+                ))
+            }
+            if reactive.averageFinalApproval <= passive.averageFinalApproval {
+                findings.append(.init(
+                    profileID: passive.profileID,
+                    difficulty: difficulty,
+                    headline: "Heavy controls are not generating the expected political drag",
+                    detail: "FullReactive average approval \(String(format: "%.1f", reactive.averageFinalApproval)) versus passive \(String(format: "%.1f", passive.averageFinalApproval))."
+                ))
+            }
+        }
+    }
+
+    let profileIDs = Set(summaries.map(\.profileID))
+    for profileID in profileIDs {
+        for bot in BalanceBot.allCases {
+            guard let apprentice = summary(profileID, .apprentice, bot),
+                  let governor = summary(profileID, .governor, bot),
+                  let volcker = summary(profileID, .volcker, bot) else { continue }
+
+            if apprentice.survivalRate + 0.02 < governor.survivalRate {
+                findings.append(.init(
+                    profileID: profileID,
+                    difficulty: nil,
+                    headline: "Difficulty ordering is inverted between Apprentice and Governor",
+                    detail: "\(bot.displayName) survives \(pct(apprentice.survivalRate)) on Apprentice versus \(pct(governor.survivalRate)) on Governor for \(profileID)."
+                ))
+            }
+            if governor.survivalRate + 0.02 < volcker.survivalRate {
+                findings.append(.init(
+                    profileID: profileID,
+                    difficulty: nil,
+                    headline: "Difficulty ordering is inverted between Governor and Volcker",
+                    detail: "\(bot.displayName) survives \(pct(governor.survivalRate)) on Governor versus \(pct(volcker.survivalRate)) on Volcker for \(profileID)."
+                ))
+            }
+        }
+    }
+
+    return findings
+}
+
+private func printValidationSummaries(_ summaries: [ValidationSummary]) {
+    let header =
+        column("Profile", 22) +
+        column("Length", 9) +
+        column("Difficulty", 10) +
+        column("Bot", 13) +
+        column("Runs", 5, rightAligned: true) +
+        column("Survive", 9, rightAligned: true) +
+        column("Median", 8, rightAligned: true) +
+        column("Final CPI", 10, rightAligned: true) +
+        column("Gap", 8, rightAligned: true) +
+        column("Reserves", 10, rightAligned: true) +
+        column("Cred", 8, rightAligned: true) +
+        column("Appr", 8, rightAligned: true) +
+        column("ExtDebt", 9, rightAligned: true)
+    print(header)
+    print(String(repeating: "-", count: header.count))
+
+    let sorted = summaries.sorted {
+        ($0.profileTitle, $0.difficulty.displayName, $0.bot.displayName)
+            < ($1.profileTitle, $1.difficulty.displayName, $1.bot.displayName)
+    }
+
+    for s in sorted {
+        let row =
+            column(s.profileTitle, 22) +
+            column(s.gameLength.displayName, 9) +
+            column(s.difficulty.displayName, 10) +
+            column(s.bot.displayName, 13) +
+            column("\(s.runs)", 5, rightAligned: true) +
+            column(String(format: "%.0f%%", s.survivalRate * 100.0), 9, rightAligned: true) +
+            column("\(s.medianScore)", 8, rightAligned: true) +
+            column(String(format: "%.1f%%", s.averageFinalInflation * 100.0), 10, rightAligned: true) +
+            column(String(format: "%+.1f%%", s.averageFinalOutputGap * 100.0), 8, rightAligned: true) +
+            column(String(format: "%.1f mo", s.averageFinalReserves), 10, rightAligned: true) +
+            column(String(format: "%.0f%%", s.averageFinalCredibility * 100.0), 8, rightAligned: true) +
+            column(String(format: "%.0f", s.averageFinalApproval), 8, rightAligned: true) +
+            column(String(format: "%.0f%%", s.averageFinalExternalDebt * 100.0), 9, rightAligned: true)
+        print(row)
+        print("  Outcomes: \(outcomeSummary(s.outcomeCounts))")
+    }
+}
+
+private func printValidationFindings(_ findings: [ValidationFinding]) {
+    print("")
+    print("Validation findings")
+    if findings.isEmpty {
+        print("  No obvious common-sense or reference-model anomalies were detected.")
+        return
+    }
+
+    for finding in findings {
+        let difficultyText = finding.difficulty.map { " [\($0.displayName)]" } ?? ""
+        print("  - \(finding.headline)\(difficultyText)")
+        print("    \(finding.detail)")
+    }
+}
+
+private func writeValidationReport(_ summaries: [ValidationSummary],
+                                   findings: [ValidationFinding],
+                                   config: BalanceConfig,
+                                   to path: String) throws {
+    let report = ValidationReport(
+        generatedAt: ISO8601DateFormatter().string(from: Date()),
+        runsPerCell: config.runsPerCell,
+        baseSeed: config.baseSeed,
+        summaries: summaries,
+        findings: findings
+    )
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(report)
+    let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+    try data.write(to: url, options: .atomic)
+}
+
+private func validationProfiles() -> [ValidationProfile] {
+    [
+        ValidationProfile(
+            id: "overheating_credit_boom",
+            title: "Overheating Boom",
+            gameLength: .short,
+            mode: .randomized,
+            horizonQuarters: 8
+        ) { state, environment in
+            state.inflation = 0.140
+            state.coreInflation = 0.126
+            state.expectedInflation = 0.112
+            state.outputGap = 0.042
+            state.gdpGrowthQoQ = 0.018
+            state.unemployment = 0.054
+            state.policyRate = 0.060
+            state.reserveRequirement = 0.10
+            state.m2Growth = 0.145
+            state.bankCreditGrowth = 0.170
+            state.credibility = 0.58
+            state.exchangeRate = 2.35
+            state.exchangeRateQoQChange = 0.030
+            state.currentAccountGDP = -0.035
+            state.capitalAccountGDP = -0.008
+            state.foreignReservesMonths = 3.1
+            state.capitalControls = 0.12
+            state.externalDebtGDP = 0.42
+            state.politicalPressure = 42.0
+            state.publicApproval = 49.0
+            environment.worldInterestRate = 0.055
+            environment.worldInflation = 0.045
+            environment.tradingPartnerGrowth = 0.030
+        },
+        ValidationProfile(
+            id: "reserve_run",
+            title: "Reserve Run",
+            gameLength: .short,
+            mode: .randomized,
+            horizonQuarters: 6
+        ) { state, environment in
+            state.inflation = 0.095
+            state.coreInflation = 0.082
+            state.expectedInflation = 0.086
+            state.outputGap = -0.010
+            state.gdpGrowthQoQ = -0.004
+            state.unemployment = 0.080
+            state.policyRate = 0.080
+            state.reserveRequirement = 0.12
+            state.m2Growth = 0.082
+            state.bankCreditGrowth = 0.080
+            state.credibility = 0.46
+            state.exchangeRate = 2.65
+            state.exchangeRateQoQChange = 0.070
+            state.currentAccountGDP = -0.060
+            state.capitalAccountGDP = -0.045
+            state.foreignReservesMonths = 1.15
+            state.capitalControls = 0.15
+            state.externalDebtGDP = 0.72
+            state.politicalPressure = 74.0
+            state.publicApproval = 36.0
+            environment.worldInterestRate = 0.090
+            environment.worldInflation = 0.045
+            environment.tradingPartnerGrowth = 0.010
+        },
+        ValidationProfile(
+            id: "deep_recession",
+            title: "Deep Recession",
+            gameLength: .extended,
+            mode: .randomized,
+            horizonQuarters: 8
+        ) { state, environment in
+            state.inflation = 0.035
+            state.coreInflation = 0.032
+            state.expectedInflation = 0.040
+            state.outputGap = -0.055
+            state.gdpGrowthQoQ = -0.015
+            state.unemployment = 0.110
+            state.policyRate = 0.090
+            state.reserveRequirement = 0.14
+            state.m2Growth = 0.050
+            state.bankCreditGrowth = 0.030
+            state.credibility = 0.63
+            state.exchangeRate = 2.20
+            state.exchangeRateQoQChange = 0.010
+            state.currentAccountGDP = -0.018
+            state.capitalAccountGDP = -0.005
+            state.foreignReservesMonths = 3.8
+            state.capitalControls = 0.20
+            state.externalDebtGDP = 0.48
+            state.politicalPressure = 66.0
+            state.publicApproval = 34.0
+            environment.worldInterestRate = 0.050
+            environment.worldInflation = 0.030
+            environment.tradingPartnerGrowth = 0.000
+        },
+        ValidationProfile(
+            id: "debt_overhang",
+            title: "Debt Overhang",
+            gameLength: .extended,
+            mode: .randomized,
+            horizonQuarters: 12
+        ) { state, environment in
+            state.inflation = 0.072
+            state.coreInflation = 0.064
+            state.expectedInflation = 0.075
+            state.outputGap = -0.012
+            state.gdpGrowthQoQ = -0.003
+            state.unemployment = 0.082
+            state.policyRate = 0.090
+            state.reserveRequirement = 0.12
+            state.m2Growth = 0.078
+            state.bankCreditGrowth = 0.072
+            state.credibility = 0.52
+            state.exchangeRate = 2.55
+            state.exchangeRateQoQChange = 0.035
+            state.currentAccountGDP = -0.045
+            state.capitalAccountGDP = -0.015
+            state.foreignReservesMonths = 2.1
+            state.capitalControls = 0.28
+            state.externalDebtGDP = 0.98
+            state.politicalPressure = 61.0
+            state.publicApproval = 41.0
+            environment.worldInterestRate = 0.075
+            environment.worldInflation = 0.035
+            environment.tradingPartnerGrowth = 0.012
+        },
+        ValidationProfile(
+            id: "capital_lockdown",
+            title: "Capital Lockdown",
+            gameLength: .extended,
+            mode: .randomized,
+            horizonQuarters: 12
+        ) { state, environment in
+            state.inflation = 0.060
+            state.coreInflation = 0.054
+            state.expectedInflation = 0.064
+            state.outputGap = 0.000
+            state.gdpGrowthQoQ = 0.006
+            state.unemployment = 0.076
+            state.policyRate = 0.070
+            state.reserveRequirement = 0.12
+            state.m2Growth = 0.078
+            state.bankCreditGrowth = 0.090
+            state.credibility = 0.60
+            state.exchangeRate = 2.05
+            state.exchangeRateQoQChange = -0.005
+            state.currentAccountGDP = 0.008
+            state.capitalAccountGDP = 0.002
+            state.foreignReservesMonths = 5.4
+            state.capitalControls = 0.75
+            state.externalDebtGDP = 0.40
+            state.politicalPressure = 45.0
+            state.publicApproval = 46.0
+            environment.worldInterestRate = 0.055
+            environment.worldInflation = 0.030
+            environment.tradingPartnerGrowth = 0.020
+        }
+    ]
+}
+
+private func pct(_ value: Double) -> String {
+    String(format: "%.1f%%", value * 100.0)
+}
+
+private func pctSigned(_ value: Double) -> String {
+    String(format: "%+.1f%%", value * 100.0)
+}
+
+private func months(_ value: Double) -> String {
+    String(format: "%.1f months", value)
+}
+
 private extension GameOutcome {
     var label: String {
         switch self {

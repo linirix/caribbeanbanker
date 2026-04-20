@@ -262,6 +262,24 @@ package func runTerminalApp() {
         exit(2)
     }
 
+    if cli.validateModel {
+        let modes = cli.mode.map { [$0] } ?? GameMode.allCasesForBalance
+        let lengths = cli.length.map { [$0] } ?? [.short, .extended]
+        let difficulties = cli.difficulty.map { [$0] } ?? Difficulty.allCases
+        let bots = cli.bot.map { [$0] } ?? BalanceBot.allCases
+        let config = BalanceConfig(
+            runsPerCell: cli.runs ?? 250,
+            baseSeed: cli.seed ?? 0xC0DE_A11C_2026,
+            lengths: lengths,
+            modes: modes,
+            difficulties: difficulties,
+            bots: bots,
+            scenarioIDs: nil,
+            reportPath: cli.reportPath)
+        runValidationHarness(config)
+        return
+    }
+
     if cli.balance {
         let modes = cli.mode.map { [$0] } ?? GameMode.allCasesForBalance
         let lengths = cli.length.map { [$0] } ?? [.short]

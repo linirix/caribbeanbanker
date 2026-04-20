@@ -20,6 +20,7 @@ struct CLIOptions: Equatable {
     var difficulty: Difficulty? = nil
     var scenarioID: String? = nil
     var balance: Bool = false
+    var validateModel: Bool = false
     var runs: Int? = nil
     var bot: BalanceBot? = nil
     var reportPath: String? = nil
@@ -71,9 +72,10 @@ Usage: CentralBanker [options]
                          skipping the difficulty selector.
   --scenario <id>        Start a historical scenario by id.
   --balance              Run the headless balance harness instead of the game.
+  --validate-model       Run the expectation-based model-validation sweep.
   --runs <int>           Runs per balance cell (default: 100).
   --bot <name>           Limit balance harness to passive, rate_only, full_reactive, or glonzo.
-  --report <path>        Write balance results as JSON when running --balance.
+  --report <path>        Write harness results as JSON when running --balance or --validate-model.
   --help                 Show this message.
 """
 
@@ -114,6 +116,8 @@ func parseCLIArgs(_ rawArgs: [String] = CommandLine.arguments) throws -> CLIOpti
             continue
         case "--balance":
             options.balance = true
+        case "--validate-model":
+            options.validateModel = true
         case "--length":
             let raw = try consumeArg(flag: "--length", expected: "s|e")
             switch raw.lowercased() {

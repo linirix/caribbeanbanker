@@ -162,6 +162,8 @@ class EconomicSimulator {
             * p.money.fiscalMonetizationCoef
         let rateGap = s.policyRate - p.money.baselineRate
         let reserveGap = s.reserveRequirement - p.money.baselineReserve
+        let reserveTightening = max(0.0, reserveGap)
+        let reserveOverhang = max(0.0, s.reserveRequirement - p.outputGap.reserveRequirementDragThreshold)
         s.m2Growth = p.money.m2Bounds.clamping(
             p.money.baseM2Growth
             - p.money.m2RateSensitivity * rateGap
@@ -188,6 +190,7 @@ class EconomicSimulator {
         let externalDemand = p.outputGap.externalDemand
             * (env.tradingPartnerGrowth / 4.0 - p.outputGap.partnerQuarterlyBaseline)
         let currentAccountSupport = p.outputGap.currentAccountSupport * s.currentAccountGDP
+        let reserveDemandDrag = p.outputGap.reserveRequirementDemandDrag * reserveOverhang
         let controlsDemandDrag = p.outputGap.capitalControlsDemandDrag * capitalControlsOverhang
         demandNoiseCarry = p.outputGap.demandNoiseCarry * demandNoiseCarry
             + normalRandom(std: p.outputGap.demandNoiseStd)
@@ -198,6 +201,7 @@ class EconomicSimulator {
             + creditImpulse
             + externalDemand
             + currentAccountSupport
+            - reserveDemandDrag
             - controlsDemandDrag
             + demandNoiseCarry)
 
@@ -286,8 +290,9 @@ class EconomicSimulator {
         let caAbsorption = p.currentAccount.absorption * s.outputGap
         let caPartner = p.currentAccount.partnerSensitivity
             * (env.tradingPartnerGrowth - p.currentAccount.partnerBaseline)
+        let caReserveCompression = p.currentAccount.reserveDemandCompression * reserveTightening
         let caPersist = p.currentAccount.persistence
-        let caTarget = caCompetitiveness + caAbsorption + caPartner
+        let caTarget = caCompetitiveness + caAbsorption + caPartner + caReserveCompression
         s.currentAccountGDP = p.currentAccount.bounds.clamping(
             caPersist * s.currentAccountGDP
             + (1.0 - caPersist) * caTarget)
@@ -295,11 +300,12 @@ class EconomicSimulator {
         // --- Capital account ---
         let kaInterest = openness * p.capitalAccount.interestSensitivity * interestDiff
         let kaExpectations = openness * p.capitalAccount.expectationsSensitivity * erChange * 4.0
+        let reserveStability = p.capitalAccount.reserveStabilitySupport * reserveTightening
         let controlsCapitalPenalty = max(0.0, s.capitalControls - p.capitalAccount.controlsPenaltyThreshold)
             * p.capitalAccount.controlsPenalty
         let defenseFlowSupport = interventionSupportCarry * 0.85 + controlsReliefCarry
         s.capitalAccountGDP = p.capitalAccount.bounds.clamping(
-            kaInterest + kaExpectations + defenseFlowSupport - controlsCapitalPenalty
+            kaInterest + kaExpectations + defenseFlowSupport + reserveStability - controlsCapitalPenalty
         )
 
         // --- Foreign reserves ---
