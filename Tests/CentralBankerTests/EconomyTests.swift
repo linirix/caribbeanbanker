@@ -797,6 +797,38 @@ final class EconomyTests: XCTestCase {
                              "Higher reserve requirements should offer some financial-stability support to the capital account.")
     }
 
+    func testRateOnlyBotCutsRatesInDeepRecessionProfile() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.035
+        sim.state.expectedInflation = 0.040
+        sim.state.outputGap = -0.055
+        sim.state.policyRate = 0.090
+        sim.state.foreignReservesMonths = 3.8
+
+        let turn = applyBalanceBotTurn(.rateOnly, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertLessThan(sim.state.policyRate, 0.090,
+                          "RateOnly bot should cut rates when inflation is subdued and output gap is deeply negative.")
+    }
+
+    func testFullReactiveBotRaisesRatesInOverheatingProfile() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.140
+        sim.state.expectedInflation = 0.112
+        sim.state.outputGap = 0.042
+        sim.state.policyRate = 0.060
+        sim.state.foreignReservesMonths = 3.1
+        sim.state.exchangeRateQoQChange = 0.030
+        sim.state.bankCreditGrowth = 0.170
+
+        let turn = applyBalanceBotTurn(.fullReactive, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertGreaterThan(sim.state.policyRate, 0.060,
+                             "FullReactive bot should lean harder into tightening when inflation and output gap are both hot.")
+    }
+
     // MARK: - 4. Oil shock raises inflation
 
     func testOilShockRaisesInflationRelativeToBaseline() {

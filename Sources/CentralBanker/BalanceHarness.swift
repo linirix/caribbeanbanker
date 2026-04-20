@@ -252,7 +252,7 @@ private func applyRateOnlyBot(to simulator: EconomicSimulator) -> BalanceTurnSta
     let targetRate = (0.0...0.25).clamping(
         neutralNominal
         + 1.10 * (s.inflation - inflationTarget)
-        - 0.50 * s.outputGap
+        + 0.50 * s.outputGap
         + reserveStress)
     adjustPolicyRate(on: simulator, toward: targetRate, maxStep: 0.010, deadband: 0.0075, stats: &stats)
     resolveCabinetDemand(for: .rateOnly, simulator: simulator, stats: &stats)
@@ -272,7 +272,7 @@ private func applyFullReactiveBot(to simulator: EconomicSimulator) -> BalanceTur
     let targetRate = (0.0...0.28).clamping(
         neutralNominal
         + 1.35 * (s.inflation - inflationTarget)
-        - 0.75 * s.outputGap
+        + 0.75 * s.outputGap
         + reserveStress
         + fxStress)
     adjustPolicyRate(on: simulator, toward: targetRate, maxStep: 0.015, deadband: 0.010, stats: &stats)
