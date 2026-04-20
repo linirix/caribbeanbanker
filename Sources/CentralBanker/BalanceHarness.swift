@@ -21,6 +21,7 @@ struct BalanceConfig {
     var modes: [GameMode]
     var difficulties: [Difficulty]
     var bots: [BalanceBot]
+    var scenarioIDs: [String]? = nil
     var reportPath: String? = nil
 }
 
@@ -40,6 +41,8 @@ struct BalanceTurnStats {
 struct BalanceRunResult {
     var gameLength: GameLength
     var mode: GameMode
+    var scenarioID: String?
+    var scenarioTitle: String?
     var difficulty: Difficulty
     var bot: BalanceBot
     var seed: UInt64
@@ -65,6 +68,8 @@ struct BalanceRunResult {
 struct BalanceSummary: Codable {
     var gameLength: GameLength
     var mode: GameMode
+    var scenarioID: String?
+    var scenarioTitle: String?
     var difficulty: Difficulty
     var bot: BalanceBot
     var runs: Int
@@ -93,19 +98,44 @@ func runBalanceHarness(_ config: BalanceConfig) {
     print("Balance harness")
     print("  Runs per cell: \(config.runsPerCell)")
     print("  Base seed: \(config.baseSeed)")
+    if let scenarioIDs = config.scenarioIDs, !scenarioIDs.isEmpty {
+        print("  Scenario cells: \(scenarioIDs.count)")
+    }
     print("")
 
     var summaries: [BalanceSummary] = []
-    for gameLength in config.lengths {
-        for mode in config.modes {
+    if let scenarioIDs = config.scenarioIDs, !scenarioIDs.isEmpty {
+        for scenarioID in scenarioIDs {
+            guard let scenario = scenarioDefinition(id: scenarioID) else { continue }
             for difficulty in config.difficulties {
                 for bot in config.bots {
                     var runs: [BalanceRunResult] = []
                     for i in 0..<config.runsPerCell {
                         let seed = config.baseSeed &+ UInt64(i)
-                        runs.append(runBalanceGame(gameLength: gameLength, mode: mode, difficulty: difficulty, bot: bot, seed: seed))
+                        runs.append(runBalanceGame(
+                            gameLength: scenario.gameLength,
+                            mode: .historical,
+                            difficulty: difficulty,
+                            bot: bot,
+                            seed: seed,
+                            scenarioID: scenarioID))
                     }
                     summaries.append(summarizeBalanceRuns(runs))
+                }
+            }
+        }
+    } else {
+        for gameLength in config.lengths {
+            for mode in config.modes {
+                for difficulty in config.difficulties {
+                    for bot in config.bots {
+                        var runs: [BalanceRunResult] = []
+                        for i in 0..<config.runsPerCell {
+                            let seed = config.baseSeed &+ UInt64(i)
+                            runs.append(runBalanceGame(gameLength: gameLength, mode: mode, difficulty: difficulty, bot: bot, seed: seed))
+                        }
+                        summaries.append(summarizeBalanceRuns(runs))
+                    }
                 }
             }
         }
@@ -129,11 +159,13 @@ func runBalanceGame(gameLength: GameLength,
                     mode: GameMode,
                     difficulty: Difficulty,
                     bot: BalanceBot,
-                    seed: UInt64) -> BalanceRunResult {
+                    seed: UInt64,
+                    scenarioID: String? = nil) -> BalanceRunResult {
     let session = GameSession(
         mode: mode,
         gameLength: gameLength,
         difficulty: difficulty,
+        scenarioID: scenarioID,
         sessionSeed: seed)
     let simulator = session.simulator
 
@@ -169,6 +201,8 @@ func runBalanceGame(gameLength: GameLength,
             return BalanceRunResult(
                 gameLength: gameLength,
                 mode: mode,
+                scenarioID: scenarioID,
+                scenarioTitle: scenarioID == nil ? nil : session.campaignTitle,
                 difficulty: difficulty,
                 bot: bot,
                 seed: seed,
@@ -467,6 +501,8 @@ func summarizeBalanceRuns(_ runs: [BalanceRunResult]) -> BalanceSummary {
     return BalanceSummary(
         gameLength: runs[0].gameLength,
         mode: runs[0].mode,
+        scenarioID: runs[0].scenarioID,
+        scenarioTitle: runs[0].scenarioTitle,
         difficulty: runs[0].difficulty,
         bot: runs[0].bot,
         runs: totalRuns,
@@ -501,14 +537,16 @@ private func percentile(_ sortedValues: [Int], _ q: Double) -> Int {
 }
 
 private func printBalanceSummaries(_ summaries: [BalanceSummary]) {
+    let includesScenarios = summaries.contains { $0.scenarioTitle != nil }
     let sorted = summaries.sorted {
-        ($0.gameLength.displayName, $0.mode.displayName, $0.difficulty.displayName, $0.bot.displayName)
-            < ($1.gameLength.displayName, $1.mode.displayName, $1.difficulty.displayName, $1.bot.displayName)
+        ($0.scenarioTitle ?? "", $0.gameLength.displayName, $0.mode.displayName, $0.difficulty.displayName, $0.bot.displayName)
+            < ($1.scenarioTitle ?? "", $1.gameLength.displayName, $1.mode.displayName, $1.difficulty.displayName, $1.bot.displayName)
     }
 
     let header =
         column("Length", 9) +
         column("Mode", 11) +
+        (includesScenarios ? column("Scenario", 24) : "") +
         column("Difficulty", 10) +
         column("Bot", 13) +
         column("Runs", 5, rightAligned: true) +
@@ -528,6 +566,7 @@ private func printBalanceSummaries(_ summaries: [BalanceSummary]) {
         let row =
             column(s.gameLength.displayName, 9) +
             column(s.mode.displayName, 11) +
+            (includesScenarios ? column(s.scenarioTitle ?? "-", 24) : "") +
             column(s.difficulty.displayName, 10) +
             column(s.bot.displayName, 13) +
             column("\(s.runs)", 5, rightAligned: true) +
@@ -570,10 +609,12 @@ private func printBalanceDiagnostics(_ summaries: [BalanceSummary]) {
     print("")
     print("Diagnostics")
     for summary in passiveFlags.sorted(by: {
-        ($0.gameLength.displayName, $0.mode.displayName, $0.difficulty.displayName)
-            < ($1.gameLength.displayName, $1.mode.displayName, $1.difficulty.displayName)
+        ($0.scenarioTitle ?? "", $0.gameLength.displayName, $0.mode.displayName, $0.difficulty.displayName)
+            < ($1.scenarioTitle ?? "", $1.gameLength.displayName, $1.mode.displayName, $1.difficulty.displayName)
     }) {
-        print("  Passive looks too safe in \(summary.gameLength.displayName) \(summary.mode.displayName) \(summary.difficulty.displayName): " +
+        let cellLabel = summary.scenarioTitle.map { "\($0) / \(summary.difficulty.displayName)" }
+            ?? "\(summary.gameLength.displayName) \(summary.mode.displayName) \(summary.difficulty.displayName)"
+        print("  Passive looks too safe in \(cellLabel): " +
               "survive \(String(format: "%.0f%%", summary.survivalRate * 100.0)), " +
               "median score \(summary.medianScore).")
     }
@@ -602,6 +643,7 @@ private struct BalanceReport: Codable {
     let generatedAt: String
     let runsPerCell: Int
     let baseSeed: UInt64
+    let scenarioIDs: [String]?
     let summaries: [BalanceSummary]
 }
 
@@ -612,6 +654,7 @@ private func writeBalanceReport(_ summaries: [BalanceSummary],
         generatedAt: ISO8601DateFormatter().string(from: Date()),
         runsPerCell: config.runsPerCell,
         baseSeed: config.baseSeed,
+        scenarioIDs: config.scenarioIDs,
         summaries: summaries)
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

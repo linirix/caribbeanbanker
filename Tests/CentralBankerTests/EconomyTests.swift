@@ -122,10 +122,10 @@ final class EconomyTests: XCTestCase {
 
         XCTAssertEqual(sim.state.year, 1973)
         XCTAssertEqual(sim.state.quarter, 3)
-        XCTAssertEqual(sim.state.inflation, 0.062, accuracy: 1e-12)
-        XCTAssertEqual(sim.state.foreignReservesMonths, 4.8, accuracy: 1e-12)
-        XCTAssertEqual(sim.environment.oilPriceIndex, 130.0, accuracy: 1e-12)
-        XCTAssertEqual(sim.state.annualizedGDPGrowth, 0.038, accuracy: 1e-12)
+        XCTAssertEqual(sim.state.inflation, 0.071, accuracy: 1e-12)
+        XCTAssertEqual(sim.state.foreignReservesMonths, 3.3, accuracy: 1e-12)
+        XCTAssertEqual(sim.environment.oilPriceIndex, 145.0, accuracy: 1e-12)
+        XCTAssertEqual(sim.state.annualizedGDPGrowth, 0.024, accuracy: 1e-12)
     }
 
     func testCLIParsesLengthFlag() throws {
@@ -241,13 +241,42 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(session.scenarioID, "oil_shock_1973")
         XCTAssertEqual(session.simulator.state.year, 1973)
         XCTAssertEqual(session.simulator.state.quarter, 3)
-        XCTAssertEqual(session.simulator.state.annualizedGDPGrowth, 0.038, accuracy: 1e-12)
+        XCTAssertEqual(session.simulator.state.annualizedGDPGrowth, 0.024, accuracy: 1e-12)
 
         let reloaded = GameSession(save: session.makeSave())
         XCTAssertEqual(reloaded.sessionSeed, testSeed)
         XCTAssertEqual(reloaded.scenarioID, "oil_shock_1973")
         XCTAssertEqual(reloaded.simulator.state.year, 1973)
         XCTAssertEqual(reloaded.simulator.state.quarter, 3)
+    }
+
+    func testLateHistoricalScenarioDoesNotAutoSucceedOnStart() {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            scenarioID: "debt_workout_1984",
+            sessionSeed: testSeed)
+
+        XCTAssertEqual(session.simulator.state.year, 1984)
+        XCTAssertEqual(session.currentOutcome(), .ongoing,
+                       "Scenario runs that start after the generic campaign success year must not auto-complete.")
+    }
+
+    func testBalanceHarnessScenarioRunUsesScenarioSession() {
+        let result = runBalanceGame(
+            gameLength: .short,
+            mode: .historical,
+            difficulty: .governor,
+            bot: .passive,
+            seed: testSeed,
+            scenarioID: "oil_shock_1973")
+
+        XCTAssertEqual(result.scenarioID, "oil_shock_1973")
+        XCTAssertEqual(result.scenarioTitle, "First Oil Shock")
+        XCTAssertEqual(result.mode, .historical)
+        XCTAssertEqual(result.gameLength, .short)
+        XCTAssertGreaterThan(result.quartersSimulated, 0)
     }
 
     func testRenderedDashboardFitsFrameAndShowsAdvisory() {

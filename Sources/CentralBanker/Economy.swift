@@ -493,7 +493,6 @@ class EconomicSimulator {
             return .depression
         }
         if s.politicalPressure > o.politicalOusterPressure { return .politicalOuster }
-        if s.year >= o.successYear { return .success }
         return .ongoing
     }
 

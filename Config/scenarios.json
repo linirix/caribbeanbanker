@@ -131,27 +131,28 @@
       "startQuarter": 3,
       "endYear": 1975,
       "endQuarter": 4,
-      "openingAnnualizedGrowth": 0.038,
+      "openingAnnualizedGrowth": 0.024,
       "stateOverrides": {
-        "inflation": 0.062,
-        "coreInflation": 0.055,
-        "expectedInflation": 0.05,
+        "inflation": 0.071,
+        "coreInflation": 0.063,
+        "expectedInflation": 0.058,
         "unemployment": 0.062,
-        "policyRate": 0.068,
-        "credibility": 0.76,
-        "currentAccountGDP": -0.018,
-        "capitalAccountGDP": 0.01,
-        "foreignReservesMonths": 4.8,
-        "externalDebtGDP": 0.26,
-        "fiscalBalanceGDP": -0.028,
-        "politicalPressure": 21.0,
-        "publicApproval": 56.0
+        "policyRate": 0.064,
+        "credibility": 0.67,
+        "currentAccountGDP": -0.032,
+        "capitalAccountGDP": 0.004,
+        "foreignReservesMonths": 3.3,
+        "externalDebtGDP": 0.29,
+        "fiscalBalanceGDP": -0.034,
+        "politicalPressure": 30.0,
+        "publicApproval": 50.0
       },
       "environmentOverrides": {
-        "worldInterestRate": 0.062,
-        "tradingPartnerGrowth": 0.022,
-        "oilPriceIndex": 130.0,
-        "commodityPriceIndex": 104.0
+        "worldInterestRate": 0.068,
+        "tradingPartnerGrowth": 0.018,
+        "oilPriceIndex": 145.0,
+        "commodityPriceIndex": 106.0,
+        "termsOfTrade": 0.96
       },
       "introNews": [
         "SCENARIO: The oil embargo has just hit the Caribbean. Every import invoice is about to look worse.",
@@ -159,21 +160,21 @@
       ],
       "goals": [
         {
-          "description": "Finish with inflation below 10%.",
+          "description": "Finish with inflation below 8.5%.",
           "condition": {
-            "maxInflation": 0.1
+            "maxInflation": 0.085
           }
         },
         {
-          "description": "Keep reserves above 2.5 months.",
+          "description": "Keep reserves above 2.8 months.",
           "condition": {
-            "minForeignReservesMonths": 2.5
+            "minForeignReservesMonths": 2.8
           }
         },
         {
-          "description": "Keep political pressure below 70.",
+          "description": "Keep political pressure below 60.",
           "condition": {
-            "maxPoliticalPressure": 70.0
+            "maxPoliticalPressure": 60.0
           }
         }
       ]
@@ -302,30 +303,30 @@
       "startQuarter": 1,
       "endYear": 1982,
       "endQuarter": 4,
-      "openingAnnualizedGrowth": -0.004,
+      "openingAnnualizedGrowth": -0.012,
       "stateOverrides": {
         "inflation": 0.124,
         "coreInflation": 0.108,
         "expectedInflation": 0.097,
         "unemployment": 0.086,
-        "policyRate": 0.145,
+        "policyRate": 0.138,
         "reserveRequirement": 0.15,
-        "credibility": 0.44,
+        "credibility": 0.40,
         "exchangeRate": 2.39,
-        "currentAccountGDP": -0.049,
-        "capitalAccountGDP": -0.018,
-        "foreignReservesMonths": 1.6,
-        "capitalControls": 0.28,
-        "externalDebtGDP": 0.46,
+        "currentAccountGDP": -0.055,
+        "capitalAccountGDP": -0.030,
+        "foreignReservesMonths": 1.25,
+        "capitalControls": 0.12,
+        "externalDebtGDP": 0.48,
         "fiscalBalanceGDP": -0.052,
-        "politicalPressure": 52.0,
-        "publicApproval": 41.0
+        "politicalPressure": 56.0,
+        "publicApproval": 39.0
       },
       "environmentOverrides": {
-        "worldInterestRate": 0.155,
-        "tradingPartnerGrowth": 0.0,
-        "oilPriceIndex": 228.0,
-        "termsOfTrade": 0.9
+        "worldInterestRate": 0.148,
+        "tradingPartnerGrowth": -0.004,
+        "oilPriceIndex": 232.0,
+        "termsOfTrade": 0.88
       },
       "introNews": [
         "SCENARIO: Traders believe the Solan Dollar is one bad quarter away from a run.",
@@ -333,21 +334,21 @@
       ],
       "goals": [
         {
-          "description": "Finish with reserves above 1.8 months.",
+          "description": "Finish with reserves above 2.0 months.",
           "condition": {
-            "minForeignReservesMonths": 1.8
+            "minForeignReservesMonths": 2.0
           }
         },
         {
-          "description": "Keep inflation below 11%.",
+          "description": "Keep inflation below 10.5%.",
           "condition": {
-            "maxInflation": 0.11
+            "maxInflation": 0.105
           }
         },
         {
-          "description": "Keep political pressure below 75.",
+          "description": "Keep political pressure below 72.",
           "condition": {
-            "maxPoliticalPressure": 75.0
+            "maxPoliticalPressure": 72.0
           }
         }
       ]

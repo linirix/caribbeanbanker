@@ -274,6 +274,7 @@ package func runTerminalApp() {
             modes: modes,
             difficulties: difficulties,
             bots: bots,
+            scenarioIDs: cli.scenarioID.map { [$0] },
             reportPath: cli.reportPath)
         runBalanceHarness(config)
         return
