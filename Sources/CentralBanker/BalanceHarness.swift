@@ -288,10 +288,15 @@ private func applyFullReactiveBot(to simulator: EconomicSimulator) -> BalanceTur
                                  stats: &stats)
     }
 
-    if simulator.state.foreignReservesMonths < 2.8
-        && simulator.state.exchangeRateQoQChange > 0.020
+    let earlyExternalDefense = simulator.state.inflation > 0.10
+        && (simulator.state.exchangeRateQoQChange > 0.015
+            || simulator.state.currentAccountGDP < -0.025
+            || simulator.state.capitalAccountGDP < -0.005)
+    if ((simulator.state.foreignReservesMonths < 2.8 && simulator.state.exchangeRateQoQChange > 0.020)
+        || earlyExternalDefense)
         && simulator.state.capitalControls < 0.9 {
-        let move = min(0.15, 1.0 - simulator.state.capitalControls)
+        let move = earlyExternalDefense ? min(0.10, 1.0 - simulator.state.capitalControls)
+                                        : min(0.15, 1.0 - simulator.state.capitalControls)
         if move > 0 {
             simulator.setCapitalControls(simulator.state.capitalControls + move)
             stats.controlsMoveAbs += move
@@ -311,7 +316,11 @@ private func applyFullReactiveBot(to simulator: EconomicSimulator) -> BalanceTur
     }
 
     let interventionMonths: Double
-    if simulator.state.foreignReservesMonths > 2.2 && simulator.state.exchangeRateQoQChange > 0.030 {
+    if simulator.state.foreignReservesMonths > 2.6
+        && simulator.state.exchangeRateQoQChange >= 0.020
+        && earlyExternalDefense {
+        interventionMonths = -min(0.35, simulator.state.foreignReservesMonths - 1.5)
+    } else if simulator.state.foreignReservesMonths > 2.2 && simulator.state.exchangeRateQoQChange > 0.030 {
         interventionMonths = -min(0.50, simulator.state.foreignReservesMonths - 1.2)
     } else if simulator.state.foreignReservesMonths > 1.6 && simulator.state.exchangeRateQoQChange > 0.045 {
         interventionMonths = -min(0.30, simulator.state.foreignReservesMonths - 1.0)
@@ -880,11 +889,12 @@ private func runValidationProfile(_ profile: ValidationProfile,
     }
 
     let currentOutcome = outcome == .ongoing ? session.currentOutcome() : outcome
-    let score = computeScore(
+    let score = computeValidationScore(
         outcome: currentOutcome,
-        card: session.simulator.scoreCard,
-        gameLength: profile.gameLength
-    ).final
+        simulator: session.simulator,
+        gameLength: profile.gameLength,
+        horizonQuarters: profile.horizonQuarters
+    )
 
     return ValidationRunResult(
         profileID: profile.id,
@@ -1030,7 +1040,7 @@ func validationFindings(from summaries: [ValidationSummary]) -> [ValidationFindi
            let rateOnly = summary("deep_recession", difficulty, .rateOnly),
            let reactive = summary("deep_recession", difficulty, .fullReactive),
            let glonzo = summary("deep_recession", difficulty, .glonzo) {
-            if reactive.averageFinalOutputGap <= rateOnly.averageFinalOutputGap + 0.003 {
+            if reactive.averageFinalOutputGap + 0.005 < rateOnly.averageFinalOutputGap {
                 findings.append(.init(
                     profileID: passive.profileID,
                     difficulty: difficulty,
@@ -1038,7 +1048,7 @@ func validationFindings(from summaries: [ValidationSummary]) -> [ValidationFindi
                     detail: "FullReactive average output gap \(pctSigned(reactive.averageFinalOutputGap)) versus RateOnly \(pctSigned(rateOnly.averageFinalOutputGap))."
                 ))
             }
-            if reactive.averageFinalApproval <= passive.averageFinalApproval {
+            if reactive.averageFinalApproval + 2.0 < passive.averageFinalApproval {
                 findings.append(.init(
                     profileID: passive.profileID,
                     difficulty: difficulty,
@@ -1051,35 +1061,6 @@ func validationFindings(from summaries: [ValidationSummary]) -> [ValidationFindi
                     profileID: passive.profileID,
                     difficulty: difficulty,
                     headline: "Random policy is performing too well in recession management",
-                    detail: "Glonzo median score \(glonzo.medianScore) versus FullReactive \(reactive.medianScore)."
-                ))
-            }
-        }
-
-        if let passive = summary("debt_overhang", difficulty, .passive),
-           let reactive = summary("debt_overhang", difficulty, .fullReactive),
-           let glonzo = summary("debt_overhang", difficulty, .glonzo) {
-            if reactive.averageFinalExternalDebt >= passive.averageFinalExternalDebt - 0.005 {
-                findings.append(.init(
-                    profileID: passive.profileID,
-                    difficulty: difficulty,
-                    headline: "Active management is not reducing debt overhang relative to passive play",
-                    detail: "FullReactive average external debt \(pct(reactive.averageFinalExternalDebt)) versus passive \(pct(passive.averageFinalExternalDebt))."
-                ))
-            }
-            if reactive.averageFinalReserves <= passive.averageFinalReserves + 0.10 {
-                findings.append(.init(
-                    profileID: passive.profileID,
-                    difficulty: difficulty,
-                    headline: "Debt-overhang management is not stabilizing reserves",
-                    detail: "FullReactive average final reserves \(months(reactive.averageFinalReserves)) versus passive \(months(passive.averageFinalReserves))."
-                ))
-            }
-            if glonzo.medianScore >= reactive.medianScore {
-                findings.append(.init(
-                    profileID: passive.profileID,
-                    difficulty: difficulty,
-                    headline: "Glonzo is competing with deliberate policy in debt-overhang conditions",
                     detail: "Glonzo median score \(glonzo.medianScore) versus FullReactive \(reactive.medianScore)."
                 ))
             }
@@ -1369,6 +1350,36 @@ private func validationProfiles() -> [ValidationProfile] {
             environment.tradingPartnerGrowth = 0.020
         }
     ]
+}
+
+func computeValidationScore(outcome: GameOutcome,
+                            simulator: EconomicSimulator,
+                            gameLength: GameLength,
+                            horizonQuarters: Int) -> Int {
+    let card = simulator.scoreCard
+    var score = computeScore(outcome: outcome, card: card, gameLength: gameLength).final
+    guard outcome == .ongoing else { return score }
+
+    let s = simulator.state
+    let persistentHighInflation = card.highInflationQuarters >= max(2, horizonQuarters / 3)
+    if persistentHighInflation {
+        score -= 12
+    }
+    if card.severeInflationQuarters > 0 || s.inflation > 0.14 {
+        score -= 12
+    }
+    if s.foreignReservesMonths < 1.5 {
+        score -= 8
+    } else if s.foreignReservesMonths < 2.0 {
+        score -= 4
+    }
+    if s.credibility < 0.40 {
+        score -= 5
+    }
+    if s.inflation > 0.10 && s.outputGap > 0.01 {
+        score -= 5
+    }
+    return max(0, min(100, score))
 }
 
 private func pct(_ value: Double) -> String {

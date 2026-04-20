@@ -280,6 +280,27 @@ final class EconomyTests: XCTestCase {
         })
     }
 
+    func testValidationScorePenalizesUnfinishedOverheatingState() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.155
+        sim.state.outputGap = 0.025
+        sim.state.foreignReservesMonths = 1.3
+        sim.state.credibility = 0.36
+        sim.scoreCard.highInflationQuarters = 4
+        sim.scoreCard.severeInflationQuarters = 2
+
+        let base = computeScore(outcome: .ongoing, card: sim.scoreCard, gameLength: .short).final
+        let validation = computeValidationScore(
+            outcome: .ongoing,
+            simulator: sim,
+            gameLength: .short,
+            horizonQuarters: 8
+        )
+
+        XCTAssertLessThan(validation, base,
+                          "Validation scoring should punish unfinished horizons that are still visibly unstable.")
+    }
+
     func testScenarioCompletionAndGoalEvaluation() {
         var state = EconomicState()
         state.year = 1976
@@ -827,6 +848,27 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(turn.activeQuarter)
         XCTAssertGreaterThan(sim.state.policyRate, 0.060,
                              "FullReactive bot should lean harder into tightening when inflation and output gap are both hot.")
+    }
+
+    func testFullReactiveBotAddsExternalDefenseEarlierInOverheatingProfile() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.140
+        sim.state.expectedInflation = 0.112
+        sim.state.outputGap = 0.042
+        sim.state.policyRate = 0.060
+        sim.state.foreignReservesMonths = 3.1
+        sim.state.exchangeRateQoQChange = 0.030
+        sim.state.currentAccountGDP = -0.035
+        sim.state.capitalAccountGDP = -0.008
+        sim.state.capitalControls = 0.12
+        sim.state.bankCreditGrowth = 0.170
+
+        let priorControls = sim.state.capitalControls
+        let turn = applyBalanceBotTurn(.fullReactive, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertTrue(sim.state.capitalControls > priorControls || turn.interventionMonthsAbs > 0.0,
+                      "FullReactive bot should not wait for reserves to collapse before defending the external side in an overheating/falling-currency profile.")
     }
 
     // MARK: - 4. Oil shock raises inflation
