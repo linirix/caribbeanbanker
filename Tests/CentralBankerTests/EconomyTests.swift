@@ -262,7 +262,7 @@ final class EconomyTests: XCTestCase {
         sim.state.politicalPressure = 78
         sim.log.addNews("SPECULATIVE ATTACK: Markets are probing the peg.", quarterLabel: sim.state.quarterLabel)
 
-        let rendered = renderDashboard(sim)
+        let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("GOVERNOR'S DASHBOARD"))
@@ -273,6 +273,32 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(rendered.contains("Yellow = relevant now."))
         XCTAssertTrue(rendered.contains("rate <x.x>"))
         XCTAssertTrue(rendered.contains("intervene <±x.x>"))
+    }
+
+    func testDashboardSnapshotReflectsCabinetAndCrisisAvailability() throws {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        let sim = session.simulator
+        sim.activeCabinetRequest = CabinetRequest(
+            type: .tightenControls,
+            detail: "Cabinet wants tighter controls after market stress.")
+        sim.state.foreignReservesMonths = 0.7
+        sim.state.exchangeRateQoQChange = 0.08
+        sim.state.externalDebtGDP = 0.76
+        sim.state.publicApproval = 30
+        sim.state.politicalPressure = 82
+
+        let snapshot = session.makeDashboardSnapshot()
+        let cabinetSection = try XCTUnwrap(snapshot.actionSections.first(where: { $0.group == .cabinet }))
+        let crisisSection = try XCTUnwrap(snapshot.actionSections.first(where: { $0.group == .crisis }))
+
+        XCTAssertTrue(cabinetSection.actions.contains(where: { $0.id == "cabinet.accept" && $0.availability == .recommended }))
+        XCTAssertTrue(crisisSection.actions.contains(where: { $0.id == "crisis" && $0.availability == .recommended }))
+        XCTAssertTrue(crisisSection.actions.contains(where: { $0.label == "measure" && $0.argumentHint != nil && $0.argumentHint != "<locked>" }))
+        XCTAssertTrue(snapshot.advisorySections.flatMap(\.rows).contains(where: { $0.contains("Cabinet pending") }))
     }
 
     func testRenderedDashboardShowsAvailableCrisisMeasureNames() {
@@ -288,7 +314,7 @@ final class EconomyTests: XCTestCase {
         let available = sim.availableCrisisMeasures()
         XCTAssertFalse(available.isEmpty, "Expected severe stress to unlock at least one crisis measure.")
 
-        let rendered = renderDashboard(sim)
+        let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
         let expectedHint = "measure " + available.map(\.type.commandName).joined(separator: "|")
 
         assertRenderedScreenFits(rendered)
@@ -296,7 +322,7 @@ final class EconomyTests: XCTestCase {
     }
 
     func testRenderedHelpFitsFrameAndRetainsSections() {
-        let rendered = renderHelp(gameLength: .extended)
+        let rendered = renderHelp(makeHelpSnapshot(gameLength: .extended))
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("HELP & REFERENCE"))
@@ -312,7 +338,7 @@ final class EconomyTests: XCTestCase {
         sim.state.externalDebtGDP = 0.74
         sim.state.currentAccountGDP = -0.052
 
-        let rendered = renderAdvisor(sim, topic: "currency")
+        let rendered = renderAdvisor(makeAdvisorSnapshot(simulator: sim, topicText: "currency"))
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("STAFF ADVISOR"))
@@ -327,7 +353,7 @@ final class EconomyTests: XCTestCase {
             return XCTFail("Expected soft_landing_1966 scenario to exist.")
         }
 
-        let rendered = renderScenarioBriefing(scenario)
+        let rendered = renderScenarioBriefing(makeScenarioBriefingSnapshot(scenario: scenario))
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("HISTORICAL SCENARIO"))
@@ -345,9 +371,9 @@ final class EconomyTests: XCTestCase {
         sim.communicationStance = .hawkish
         stepQuarter(sim)
 
-        let report = renderCampaignReport(sim, gameLength: .short)
-        let debrief = renderQuarterDebrief(sim)
-        let tutorial = renderTutorial(sim, mode: .historical, gameLength: .short)
+        let report = renderCampaignReport(makeReportSnapshot(simulator: sim, gameLength: .short))
+        let debrief = renderQuarterDebrief(makeDebriefSnapshot(simulator: sim))
+        let tutorial = renderTutorial(makeTutorialSnapshot(simulator: sim, mode: .historical, gameLength: .short))
 
         assertRenderedScreenFits(report)
         assertRenderedScreenFits(debrief)
@@ -364,8 +390,8 @@ final class EconomyTests: XCTestCase {
         sim.log.addNews("CABINET REQUEST: Ministers want immediate relief before approval erodes further.", quarterLabel: sim.state.quarterLabel)
         stepQuarter(sim)
 
-        let history = renderHistory(sim)
-        let news = renderNewsLog(sim)
+        let history = renderHistory(makeHistorySnapshot(simulator: sim))
+        let news = renderNewsLog(makeNewsSnapshot(simulator: sim))
 
         assertRenderedScreenFits(history)
         assertRenderedScreenFits(news)
@@ -383,8 +409,8 @@ final class EconomyTests: XCTestCase {
         sim.state.publicApproval = 33
         sim.state.politicalPressure = 81
 
-        let status = renderStatus(sim, gameLength: .extended, scenarioID: "debt_crisis_1982")
-        let crisis = renderCrisisOptions(sim)
+        let status = renderStatus(makeStatusSnapshot(simulator: sim, gameLength: .extended, scenarioID: "debt_crisis_1982"))
+        let crisis = renderCrisisOptions(makeCrisisOptionsSnapshot(simulator: sim))
 
         assertRenderedScreenFits(status)
         assertRenderedScreenFits(crisis)
@@ -408,13 +434,29 @@ final class EconomyTests: XCTestCase {
             macroSchedule: [:],
             rateSchedule: [:])
         let estimate = forecastEstimate(for: report, sessionSeed: testSeed)
-        let preview = renderPreview(estimate, headerNote: "Hypothetical: rate 11.5")
+        let preview = renderPreview(makePreviewSnapshot(estimate: estimate, headerNote: "Hypothetical: rate 11.5"))
 
         assertRenderedScreenFits(preview)
         XCTAssertTrue(preview.contains("STAFF FORECAST"))
         XCTAssertTrue(preview.contains("Events this quarter"))
         XCTAssertTrue(preview.contains("Indicator"))
         XCTAssertTrue(preview.contains("Hypothetical: rate 11.5"))
+    }
+
+    func testPreviewSnapshotIsNonMutatingAndCarriesHypotheticalHeader() {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        let originalRate = session.simulator.state.policyRate
+
+        let snapshot = session.makePreviewSnapshot(changes: [.rate(0.115), .controls(0.6)])
+
+        XCTAssertEqual(session.simulator.state.policyRate, originalRate, accuracy: 1e-12)
+        XCTAssertEqual(snapshot.headerNote, "Hypothetical: rate 11.50%  |  controls 6/10")
+        XCTAssertFalse(snapshot.projections.isEmpty)
+        XCTAssertTrue(snapshot.title.contains("STAFF FORECAST"))
     }
 
     func testRenderedGameOverFitsFrame() {
@@ -439,12 +481,32 @@ final class EconomyTests: XCTestCase {
         sim.scoreCard.highUnemploymentQuarters = 5
         sim.scoreCard.nearOusterQuarters = 1
 
-        let rendered = renderGameOver(.success, sim, gameLength: .short)
+        let rendered = renderGameOver(makeGameOverSnapshot(outcome: .success, simulator: sim, gameLength: .short))
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("YOU SURVIVED"))
         XCTAssertTrue(rendered.contains("FINAL STATE"))
         XCTAssertTrue(rendered.contains("SCORECARD"))
+    }
+
+    func testAdvisorSnapshotIncludesRequestedFocusAndRecommendations() {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        let sim = session.simulator
+        sim.state.foreignReservesMonths = 0.9
+        sim.state.exchangeRateQoQChange = 0.07
+        sim.state.externalDebtGDP = 0.74
+        sim.state.currentAccountGDP = -0.052
+
+        let snapshot = session.makeAdvisorSnapshot(topic: "currency")
+
+        XCTAssertEqual(snapshot.requestedFocusLine, "Requested focus: Currency Defense")
+        XCTAssertFalse(snapshot.recommendationSection.bullets.isEmpty)
+        XCTAssertFalse(snapshot.watchSection.bullets.isEmpty)
+        XCTAssertTrue(snapshot.topicSuggestions.contains("advisor currency"))
     }
 
     func testScenarioAssessmentAppearsInReportAndEndScreen() {
@@ -455,8 +517,8 @@ final class EconomyTests: XCTestCase {
         sim.state.year = 1968
         sim.state.quarter = 4
 
-        let report = renderCampaignReport(sim, gameLength: .short, scenarioID: "soft_landing_1966")
-        let gameOver = renderGameOver(.success, sim, gameLength: .short, scenarioID: "soft_landing_1966")
+        let report = renderCampaignReport(makeReportSnapshot(simulator: sim, gameLength: .short, scenarioID: "soft_landing_1966"))
+        let gameOver = renderGameOver(makeGameOverSnapshot(outcome: .success, simulator: sim, gameLength: .short, scenarioID: "soft_landing_1966"))
 
         assertRenderedScreenFits(report)
         assertRenderedScreenFits(gameOver)
@@ -464,6 +526,24 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(gameOver.contains("SCENARIO ASSESSMENT"))
         XCTAssertTrue(gameOver.contains("Lesson focus:"))
         XCTAssertTrue(gameOver.contains("acting early"))
+    }
+
+    func testScenarioBriefingAndTutorialSnapshotsCarryTeachingFocus() throws {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            scenarioID: "soft_landing_1966",
+            sessionSeed: testSeed)
+
+        let briefing = try XCTUnwrap(session.makeScenarioBriefingSnapshot())
+        let tutorial = session.makeTutorialSnapshot()
+
+        XCTAssertTrue(briefing.title.contains("Soft Landing"))
+        XCTAssertFalse(briefing.teachingFocus.isEmpty)
+        XCTAssertFalse(briefing.objectives.isEmpty)
+        XCTAssertFalse(tutorial.scenarioGoals.isEmpty)
+        XCTAssertTrue(tutorial.focus.contains(where: { $0.contains("Soft Landing") }))
     }
 
     func testPassiveBalanceBotMakesNoPolicyMoves() {

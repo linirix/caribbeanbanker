@@ -20,6 +20,7 @@ let coreSources = [
     "Sources/CentralBanker/GameSession.swift",
     "Sources/CentralBanker/ModelParameters.swift",
     "Sources/CentralBanker/OpeningConditions.swift",
+    "Sources/CentralBanker/Presentation.swift",
     "Sources/CentralBanker/QuarterReport.swift",
     "Sources/CentralBanker/Random.swift",
     "Sources/CentralBanker/SaveLoad.swift",

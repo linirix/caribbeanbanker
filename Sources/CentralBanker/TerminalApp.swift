@@ -297,12 +297,12 @@ package func runTerminalApp() {
     var lastMessage: String? = nil
     var gameRunning = true
 
-    if let scenario = session.scenario {
-        drawScenarioBriefing(scenario)
+    if let scenarioSnapshot = session.makeScenarioBriefingSnapshot() {
+        print(renderScenarioBriefing(scenarioSnapshot))
         waitForAnyKey()
     }
 
-    drawDashboard(session.simulator)
+    drawDashboard(session.makeDashboardSnapshot())
 
     while gameRunning {
         if let msg = lastMessage {
@@ -323,22 +323,17 @@ package func runTerminalApp() {
         case .advance:
             let outcome = session.advance()
             if outcome != .ongoing {
-                drawGameOver(
-                    outcome,
-                    session.simulator,
-                    gameLength: session.gameLength,
-                    scenarioID: session.scenarioID)
+                print(renderGameOver(session.makeGameOverSnapshot(outcome: outcome)))
                 waitForAnyKey()
                 gameRunning = false
                 break
             }
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .preview(let changes):
-            let preview = session.preview(changes: changes)
-            drawPreview(preview.estimate, headerNote: preview.note)
+            drawPreview(session.makePreviewSnapshot(changes: changes))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .save(let path):
             do {
@@ -351,7 +346,7 @@ package func runTerminalApp() {
         case .load(let path):
             do {
                 session = try GameSession.load(from: path)
-                drawDashboard(session.simulator)
+                drawDashboard(session.makeDashboardSnapshot())
                 lastMessage = A.bGreen + "Loaded " + A.reset + resolvedSavePath(path)
                     + A.dim + "  (seed \(session.sessionSeed), \(session.loadDescription()))" + A.reset
             } catch {
@@ -359,49 +354,49 @@ package func runTerminalApp() {
             }
 
         case .history:
-            drawHistory(session.simulator)
+            print(renderHistory(session.makeHistorySnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .news:
-            drawNewsLog(session.simulator)
+            print(renderNewsLog(session.makeNewsSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .crisis:
-            drawCrisisOptions(session.simulator)
+            print(renderCrisisOptions(session.makeCrisisOptionsSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .report:
-            drawCampaignReport(session.simulator, gameLength: session.gameLength, scenarioID: session.scenarioID)
+            print(renderCampaignReport(session.makeReportSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .debrief:
-            drawQuarterDebrief(session.simulator)
+            print(renderQuarterDebrief(session.makeDebriefSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .tutorial:
-            drawTutorial(session.simulator, mode: session.mode, gameLength: session.gameLength, scenarioID: session.scenarioID)
+            print(renderTutorial(session.makeTutorialSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .advisor(let topic):
-            drawAdvisor(session.simulator, topic: topic)
+            print(renderAdvisor(session.makeAdvisorSnapshot(topic: topic)))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .status:
-            drawStatus(session.simulator, gameLength: session.gameLength, scenarioID: session.scenarioID)
+            print(renderStatus(session.makeStatusSnapshot()))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .help:
-            drawHelp(gameLength: session.gameLength, scenarioID: session.scenarioID)
+            print(renderHelp(makeHelpSnapshot(gameLength: session.gameLength, scenarioID: session.scenarioID)))
             waitForAnyKey()
-            drawDashboard(session.simulator)
+            drawDashboard(session.makeDashboardSnapshot())
 
         case .quit:
             print()
@@ -417,7 +412,7 @@ package func runTerminalApp() {
         default:
             if let msg = applyCommand(cmd, simulator: session.simulator) {
                 lastMessage = msg
-                drawDashboard(session.simulator)
+                drawDashboard(session.makeDashboardSnapshot())
             }
         }
     }
