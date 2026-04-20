@@ -80,6 +80,7 @@ extension EconomicSimulator {
 
         let config = GameConfigs.crisisMeasure(type)
         crisisCooldownQuarters = GameConfigs.tuning.crisis.cooldownQuarters
+        scoreCard.recordCrisisMeasure(type)
         applyConfiguredEffects(config.effects)
         log.addNews(config.newsLine, quarterLabel: state.quarterLabel)
         return config.resultMessage

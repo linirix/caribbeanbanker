@@ -1246,6 +1246,50 @@ final class EconomyTests: XCTestCase {
                              "Incredible hawkish messaging should nudge expectations up, not down.")
     }
 
+    func testConsistentDovishCommunicationBuildsPoliticalSpaceWithoutUnanchoringExpectations() {
+        let balanced = EconomicSimulator(seed: testSeed)
+        let dovish = EconomicSimulator(seed: testSeed)
+        for sim in [balanced, dovish] {
+            sim.state.inflation = 0.058
+            sim.state.expectedInflation = 0.055
+            sim.state.outputGap = -0.022
+            sim.state.policyRate = 0.055
+            sim.state.exchangeRateQoQChange = 0.010
+        }
+        dovish.communicationStance = .dovish
+
+        stepQuarter(balanced)
+        stepQuarter(dovish)
+
+        XCTAssertGreaterThan(dovish.state.publicApproval, balanced.state.publicApproval + 1.0,
+                             "Disciplined dovish communication should buy meaningful political goodwill.")
+        XCTAssertLessThanOrEqual(dovish.state.expectedInflation, balanced.state.expectedInflation + 0.001,
+                                 "Consistent dovish messaging should not noticeably unanchor expectations.")
+        XCTAssertGreaterThan(dovish.state.credibility, balanced.state.credibility,
+                             "Consistent dovish messaging should preserve or slightly improve credibility.")
+    }
+
+    func testInconsistentDovishCommunicationHurtsCredibilityAndExpectations() {
+        let balanced = EconomicSimulator(seed: testSeed)
+        let dovish = EconomicSimulator(seed: testSeed)
+        for sim in [balanced, dovish] {
+            sim.state.inflation = 0.130
+            sim.state.expectedInflation = 0.095
+            sim.state.outputGap = 0.000
+            sim.state.policyRate = 0.040
+            sim.state.exchangeRateQoQChange = 0.070
+        }
+        dovish.communicationStance = .dovish
+
+        stepQuarter(balanced)
+        stepQuarter(dovish)
+
+        XCTAssertLessThan(dovish.state.credibility, balanced.state.credibility - 0.01,
+                          "Dovish messaging against inflation and FX stress should materially damage credibility.")
+        XCTAssertGreaterThan(dovish.state.expectedInflation, balanced.state.expectedInflation,
+                             "Incredible dovish messaging should lift expectations.")
+    }
+
     // MARK: - 5b. Cabinet requests generate and resolve deterministically
 
     func testCabinetCutRatesRequestCanBeAccepted() {
@@ -1684,8 +1728,57 @@ final class EconomyTests: XCTestCase {
         cleanState.politicalPressure = 20
         for _ in 0..<40 { cleanCard.record(cleanState) }
         let cleanBreakdown = computeScore(outcome: .success, card: cleanCard)
-        XCTAssertGreaterThan(cleanBreakdown.final, breakdown.final + 30,
+        XCTAssertGreaterThan(cleanBreakdown.final, breakdown.final + 10,
                              "A clean success run should easily outscore a rough one.")
+    }
+
+    func testRepeatedEmergencyDependenceIsPenalizedInScore() {
+        var card = ScoreCard()
+        var state = EconomicState()
+        state.inflation = 0.05
+        state.unemployment = 0.07
+        state.gdpGrowthQoQ = 0.004
+        state.credibility = 0.68
+        state.foreignReservesMonths = 2.8
+        state.politicalPressure = 34
+
+        for _ in 0..<20 { card.record(state) }
+        card.recordCrisisMeasure(.bankHoliday)
+        card.recordCrisisMeasure(.bankHoliday)
+        card.recordCrisisMeasure(.bankHoliday)
+        card.recordCrisisMeasure(.imfProgram)
+        card.recordCrisisMeasure(.imfProgram)
+
+        let breakdown = computeScore(outcome: .success, card: card, difficulty: .apprentice)
+        let bankHolidayPenalty = breakdown.items.first(where: { $0.label == "Repeated bank holidays" })?.points
+        let imfPenalty = breakdown.items.first(where: { $0.label == "Repeated IMF reliance" })?.points
+
+        XCTAssertEqual(bankHolidayPenalty, -4)
+        XCTAssertEqual(imfPenalty, -2)
+    }
+
+    func testHarderDifficultiesScalePenaltiesAndStillRewardCompletion() {
+        var card = ScoreCard()
+        card.quartersSimulated = GameLength.short.totalQuarters
+        card.highInflationQuarters = 12
+        card.severeInflationQuarters = 5
+        card.recessionQuarters = 8
+        card.lowestReserves = 1.6
+        card.lowestCredibility = 0.30
+        card.peakPoliticalPressure = 84
+
+        let apprentice = computeScore(outcome: .success, card: card, gameLength: .short, difficulty: .apprentice)
+        let governor = computeScore(outcome: .success, card: card, gameLength: .short, difficulty: .governor)
+        let volcker = computeScore(outcome: .success, card: card, gameLength: .short, difficulty: .volcker)
+
+        XCTAssertGreaterThan(governor.final, apprentice.final,
+                             "Harder difficulties should get score normalization so the same macro scars are not punished identically.")
+        XCTAssertGreaterThan(volcker.final, governor.final,
+                             "Volcker should receive the strongest score normalization for a given scorecard.")
+        XCTAssertNotNil(governor.items.first(where: { $0.label == "Reached the end of the mandate" }),
+                        "Successful runs should now receive explicit completion credit.")
+        XCTAssertNotNil(governor.items.first(where: { $0.label.contains("Held the chair") }),
+                        "Runs should now receive transparent endurance credit based on how much of the campaign they survived.")
     }
 
     // MARK: - 5. Inflation surprise erodes credibility

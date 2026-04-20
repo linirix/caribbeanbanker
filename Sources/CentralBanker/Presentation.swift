@@ -320,6 +320,7 @@ extension GameSession {
         buildReportSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
+            difficulty: difficulty,
             gameLength: gameLength,
             scenarioID: scenarioID
         )
@@ -382,6 +383,7 @@ extension GameSession {
             outcome: outcome,
             simulator: simulator,
             context: makePresentationSnapshot(),
+            difficulty: difficulty,
             gameLength: gameLength,
             scenarioID: scenarioID
         )
@@ -1148,12 +1150,13 @@ private func buildAdvisorSnapshot(simulator: EconomicSimulator,
 
 private func buildReportSnapshot(simulator: EconomicSimulator,
                                  context: GamePresentationSnapshot,
+                                 difficulty: Difficulty = .governor,
                                  gameLength: GameLength,
                                  scenarioID: String?) -> ReportSnapshot {
     let snaps = simulator.log.quarterSnapshots
     let card = simulator.scoreCard
     let liveOutcome: GameOutcome = isCampaignComplete(state: simulator.state, gameLength: gameLength, scenarioID: scenarioID) ? .success : simulator.checkOutcome()
-    let score = computeScore(outcome: liveOutcome, card: card, gameLength: gameLength)
+    let score = computeScore(outcome: liveOutcome, card: card, gameLength: gameLength, difficulty: difficulty)
     let avgInflation = snaps.isEmpty ? 0.0 : snaps.map(\.inflation).reduce(0, +) / Double(snaps.count)
     let avgGrowth = snaps.isEmpty ? 0.0 : snaps.map(\.annualizedGDPGrowth).reduce(0, +) / Double(snaps.count)
     let avgUnemployment = snaps.isEmpty ? 0.0 : snaps.map(\.unemployment).reduce(0, +) / Double(snaps.count)
@@ -1541,11 +1544,12 @@ private func buildStatusSnapshot(simulator: EconomicSimulator,
 private func buildGameOverSnapshot(outcome: GameOutcome,
                                    simulator: EconomicSimulator,
                                    context: GamePresentationSnapshot,
+                                   difficulty: Difficulty = .governor,
                                    gameLength: GameLength,
                                    scenarioID: String?) -> GameOverSnapshot {
     let s = simulator.state
     let card = simulator.scoreCard
-    let score = computeScore(outcome: outcome, card: card, gameLength: gameLength)
+    let score = computeScore(outcome: outcome, card: card, gameLength: gameLength, difficulty: difficulty)
     let scenario = scenarioDefinition(id: scenarioID)
     let goalStatuses = evaluateScenarioGoals(scenarioID: scenarioID, state: s)
     let assessment = scenario.map { scenarioAssessmentSnapshot(for: $0, goalStatuses: goalStatuses, outcome: outcome) }

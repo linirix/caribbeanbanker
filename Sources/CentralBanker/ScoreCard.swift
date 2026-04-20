@@ -33,6 +33,60 @@ struct ScoreCard: Codable {
     var peakPolicyRate: Double = 0.0
     var peakCapitalControls: Double = 0.0
     var peakReserveRequirement: Double = 0.0
+    var imfProgramsUsed: Int = 0
+    var bankHolidaysUsed: Int = 0
+    var emergencyLiquidityUsed: Int = 0
+
+    enum CodingKeys: String, CodingKey {
+        case quartersSimulated
+        case highInflationQuarters
+        case severeInflationQuarters
+        case recessionQuarters
+        case stagflationQuarters
+        case highUnemploymentQuarters
+        case lowCredibilityQuarters
+        case nearOusterQuarters
+        case peakInflation
+        case troughGrowthAnnualized
+        case peakUnemployment
+        case lowestCredibility
+        case lowestReserves
+        case peakPoliticalPressure
+        case peakExternalDebtGDP
+        case peakPolicyRate
+        case peakCapitalControls
+        case peakReserveRequirement
+        case imfProgramsUsed
+        case bankHolidaysUsed
+        case emergencyLiquidityUsed
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        quartersSimulated = try container.decodeIfPresent(Int.self, forKey: .quartersSimulated) ?? 0
+        highInflationQuarters = try container.decodeIfPresent(Int.self, forKey: .highInflationQuarters) ?? 0
+        severeInflationQuarters = try container.decodeIfPresent(Int.self, forKey: .severeInflationQuarters) ?? 0
+        recessionQuarters = try container.decodeIfPresent(Int.self, forKey: .recessionQuarters) ?? 0
+        stagflationQuarters = try container.decodeIfPresent(Int.self, forKey: .stagflationQuarters) ?? 0
+        highUnemploymentQuarters = try container.decodeIfPresent(Int.self, forKey: .highUnemploymentQuarters) ?? 0
+        lowCredibilityQuarters = try container.decodeIfPresent(Int.self, forKey: .lowCredibilityQuarters) ?? 0
+        nearOusterQuarters = try container.decodeIfPresent(Int.self, forKey: .nearOusterQuarters) ?? 0
+        peakInflation = try container.decodeIfPresent(Double.self, forKey: .peakInflation) ?? 0.0
+        troughGrowthAnnualized = try container.decodeIfPresent(Double.self, forKey: .troughGrowthAnnualized) ?? 0.0
+        peakUnemployment = try container.decodeIfPresent(Double.self, forKey: .peakUnemployment) ?? 0.0
+        lowestCredibility = try container.decodeIfPresent(Double.self, forKey: .lowestCredibility) ?? 1.0
+        lowestReserves = try container.decodeIfPresent(Double.self, forKey: .lowestReserves) ?? 99.0
+        peakPoliticalPressure = try container.decodeIfPresent(Double.self, forKey: .peakPoliticalPressure) ?? 0.0
+        peakExternalDebtGDP = try container.decodeIfPresent(Double.self, forKey: .peakExternalDebtGDP) ?? 0.0
+        peakPolicyRate = try container.decodeIfPresent(Double.self, forKey: .peakPolicyRate) ?? 0.0
+        peakCapitalControls = try container.decodeIfPresent(Double.self, forKey: .peakCapitalControls) ?? 0.0
+        peakReserveRequirement = try container.decodeIfPresent(Double.self, forKey: .peakReserveRequirement) ?? 0.0
+        imfProgramsUsed = try container.decodeIfPresent(Int.self, forKey: .imfProgramsUsed) ?? 0
+        bankHolidaysUsed = try container.decodeIfPresent(Int.self, forKey: .bankHolidaysUsed) ?? 0
+        emergencyLiquidityUsed = try container.decodeIfPresent(Int.self, forKey: .emergencyLiquidityUsed) ?? 0
+    }
 
     // Call once per simulated quarter, after all dynamics have been applied
     // but before `advanceTime()`. The simulator wires this in next to
@@ -59,6 +113,17 @@ struct ScoreCard: Codable {
         peakPolicyRate = Swift.max(peakPolicyRate, s.policyRate)
         peakCapitalControls = Swift.max(peakCapitalControls, s.capitalControls)
         peakReserveRequirement = Swift.max(peakReserveRequirement, s.reserveRequirement)
+    }
+
+    mutating func recordCrisisMeasure(_ type: CrisisMeasureType) {
+        switch type {
+        case .imfProgram:
+            imfProgramsUsed += 1
+        case .bankHoliday:
+            bankHolidaysUsed += 1
+        case .emergencyLiquidity:
+            emergencyLiquidityUsed += 1
+        }
     }
 }
 
@@ -90,15 +155,31 @@ struct ScoreBreakdown {
 
 func computeScore(outcome: GameOutcome,
                   card: ScoreCard,
-                  gameLength: GameLength = .short) -> ScoreBreakdown {
+                  gameLength: GameLength = .short,
+                  difficulty: Difficulty = .governor) -> ScoreBreakdown {
     let scoring = GameConfigs.tuning.scoring
     let baseline = scoring.baseline
     var items: [ScoreBreakdown.LineItem] = []
     let durationScale = gameLength.scorePenaltyScale
     let bonusScale = gameLength == .extended ? scoring.extendedBonusScale : 1.0
+    let mandateHeldBonus = gameLength == .extended
+        ? scoring.calibration.extendedMandateHeldBonus
+        : scoring.calibration.shortMandateHeldBonus
+    let enduranceBonusMax = gameLength == .extended
+        ? scoring.calibration.extendedEnduranceBonusMax
+        : scoring.calibration.shortEnduranceBonusMax
+    let penaltyScale: Double
+    switch difficulty {
+    case .apprentice:
+        penaltyScale = scoring.calibration.difficultyPenaltyScale.apprentice
+    case .governor:
+        penaltyScale = scoring.calibration.difficultyPenaltyScale.governor
+    case .volcker:
+        penaltyScale = scoring.calibration.difficultyPenaltyScale.volcker
+    }
 
     func scaledPenalty(_ perQuarter: Int, _ quarters: Int) -> Int {
-        let raw = Double(perQuarter * quarters) * durationScale
+        let raw = Double(perQuarter * quarters) * durationScale * penaltyScale
         return Int(raw.rounded(FloatingPointRoundingRule.toNearestOrAwayFromZero))
     }
 
@@ -107,17 +188,22 @@ func computeScore(outcome: GameOutcome,
         return Int(raw.rounded(FloatingPointRoundingRule.toNearestOrAwayFromZero))
     }
 
+    func scaledNegative(_ base: Int) -> Int {
+        let raw = Double(base) * penaltyScale
+        return Int(raw.rounded(FloatingPointRoundingRule.toNearestOrAwayFromZero))
+    }
+
     // Hard outcomes: losing dominates the score. A won-with-scars run will
     // still show these deductions in their itemized form when relevant.
     switch outcome {
     case .currencyCrisis:
-        items.append(.init(label: "Currency crisis (mandate failure)", points: -scoring.outcomePenalties.currencyCrisis))
+        items.append(.init(label: "Currency crisis (mandate failure)", points: -scaledNegative(scoring.outcomePenalties.currencyCrisis)))
     case .hyperinflation:
-        items.append(.init(label: "Hyperinflation (mandate failure)",  points: -scoring.outcomePenalties.hyperinflation))
+        items.append(.init(label: "Hyperinflation (mandate failure)",  points: -scaledNegative(scoring.outcomePenalties.hyperinflation)))
     case .depression:
-        items.append(.init(label: "Depression (mandate failure)",      points: -scoring.outcomePenalties.depression))
+        items.append(.init(label: "Depression (mandate failure)",      points: -scaledNegative(scoring.outcomePenalties.depression)))
     case .politicalOuster:
-        items.append(.init(label: "Political ouster (independence lost)", points: -scoring.outcomePenalties.politicalOuster))
+        items.append(.init(label: "Political ouster (independence lost)", points: -scaledNegative(scoring.outcomePenalties.politicalOuster)))
     case .success, .ongoing:
         break
     }
@@ -155,22 +241,45 @@ func computeScore(outcome: GameOutcome,
     // Extremes: a peak that almost took the run down is its own punishment.
     if card.peakInflation > scoring.extremes.peakInflationThreshold {
         items.append(.init(label: String(format: "Peak inflation %.0f%%", card.peakInflation * 100),
-                           points: -scoring.extremes.peakInflationPenalty))
+                           points: -scaledNegative(scoring.extremes.peakInflationPenalty)))
     }
     if card.lowestReserves < scoring.extremes.lowestReservesThreshold {
         items.append(.init(label: String(format: "Reserves dropped to %.1f months", card.lowestReserves),
-                           points: -scoring.extremes.lowestReservesPenalty))
+                           points: -scaledNegative(scoring.extremes.lowestReservesPenalty)))
     }
     if card.lowestCredibility < scoring.extremes.lowestCredibilityThreshold {
         items.append(.init(label: String(format: "Credibility trough %.0f%%", card.lowestCredibility * 100),
-                           points: -scoring.extremes.lowestCredibilityPenalty))
+                           points: -scaledNegative(scoring.extremes.lowestCredibilityPenalty)))
     }
     if card.peakPoliticalPressure > scoring.extremes.peakPoliticalPressureThreshold {
         items.append(.init(label: String(format: "Peak political pressure %.0f / 88", card.peakPoliticalPressure),
-                           points: -scoring.extremes.peakPoliticalPressurePenalty))
+                           points: -scaledNegative(scoring.extremes.peakPoliticalPressurePenalty)))
+    }
+
+    let excessIMFPrograms = max(0, card.imfProgramsUsed - 1)
+    if excessIMFPrograms > 0 {
+        items.append(.init(label: "Repeated IMF reliance",
+                           points: -scaledNegative(2 * excessIMFPrograms)))
+    }
+    let excessBankHolidays = max(0, card.bankHolidaysUsed - 1)
+    if excessBankHolidays > 0 {
+        items.append(.init(label: "Repeated bank holidays",
+                           points: -scaledNegative(2 * excessBankHolidays)))
+    }
+
+    let completionRatio = min(1.0, max(0.0, Double(card.quartersSimulated) / Double(gameLength.totalQuarters)))
+    let enduranceBonus = Int((Double(enduranceBonusMax) * completionRatio * bonusScale)
+        .rounded(FloatingPointRoundingRule.toNearestOrAwayFromZero))
+    if enduranceBonus > 0 {
+        items.append(.init(label: String(format: "Held the chair for %.0f%% of the mandate", completionRatio * 100),
+                           points: enduranceBonus))
     }
 
     // Bonuses for a genuinely clean run.
+    if outcome == .success {
+        items.append(.init(label: "Reached the end of the mandate",
+                           points: +scaledBonus(mandateHeldBonus)))
+    }
     if outcome == .success && card.peakInflation < scoring.successBonuses.peakInflationThreshold {
         items.append(.init(label: "Inflation contained throughout (peak <7%)",
                            points: +scaledBonus(scoring.successBonuses.inflationContainedBonus)))
@@ -188,7 +297,13 @@ func computeScore(outcome: GameOutcome,
                            points: +scaledBonus(scoring.successBonuses.externalPositionBonus)))
     }
 
-    let total = items.reduce(baseline) { $0 + $1.points }
+    var total = items.reduce(baseline) { $0 + $1.points }
+    if total > scoring.calibration.topEndCompressionThreshold {
+        let overflow = total - scoring.calibration.topEndCompressionThreshold
+        let compressedOverflow = Int((Double(overflow) * scoring.calibration.topEndCompressionFactor)
+            .rounded(FloatingPointRoundingRule.toNearestOrAwayFromZero))
+        total = scoring.calibration.topEndCompressionThreshold + compressedOverflow
+    }
     let finalScore = Swift.max(0, Swift.min(100, total))
 
     let sortedBands = scoring.headlineBands.sorted { $0.minScore > $1.minScore }

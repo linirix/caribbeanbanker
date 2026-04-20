@@ -414,12 +414,20 @@ class EconomicSimulator {
             }
 
         case .dovish:
-            s.politicalPressure = params.political.bounds.clamping(s.politicalPressure - 2.0)
-            if s.inflation > 0.08 {
-                s.credibility = params.credibility.bounds.clamping(s.credibility - 0.015)
-                s.expectedInflation = params.expectations.bounds.clamping(s.expectedInflation + 0.004)
-                news.append("COMMUNICATION: Dovish messaging amid high inflation unsettles markets and lifts inflation expectations.")
+            if isDovishCommunicationConsistent(state: s) {
+                s.politicalPressure = params.political.bounds.clamping(s.politicalPressure - 2.5)
+                s.publicApproval = params.approval.bounds.clamping(s.publicApproval + 2.0)
+                s.credibility = params.credibility.bounds.clamping(s.credibility + 0.008)
+                s.expectedInflation = params.expectations.bounds.clamping(s.expectedInflation - 0.002)
+                interventionSupportCarry = min(0.015, interventionSupportCarry + 0.006)
+                news.append("COMMUNICATION: Dovish guidance fits the slack economy and lands as measured reassurance, not surrender.")
+            } else if s.inflation > 0.08 || s.exchangeRateQoQChange > 0.030 {
+                s.politicalPressure = params.political.bounds.clamping(s.politicalPressure + 0.5)
+                s.credibility = params.credibility.bounds.clamping(s.credibility - 0.018)
+                s.expectedInflation = params.expectations.bounds.clamping(s.expectedInflation + 0.006)
+                news.append("COMMUNICATION: Dovish messaging against persistent inflation or currency stress unsettles markets and lifts inflation expectations.")
             } else {
+                s.politicalPressure = params.political.bounds.clamping(s.politicalPressure - 2.0)
                 s.publicApproval = params.approval.bounds.clamping(s.publicApproval + 1.5)
                 news.append("COMMUNICATION: Dovish reassurance calms households and buys modest political goodwill.")
             }
@@ -632,6 +640,14 @@ class EconomicSimulator {
     func isHawkishCommunicationConsistent(state s: EconomicState? = nil) -> Bool {
         let state = s ?? self.state
         return state.policyRate >= state.expectedInflation + 0.01
+    }
+
+    func isDovishCommunicationConsistent(state s: EconomicState? = nil) -> Bool {
+        let state = s ?? self.state
+        return state.outputGap < -0.005
+            && state.inflation < 0.085
+            && state.exchangeRateQoQChange < 0.028
+            && state.policyRate >= state.expectedInflation - 0.010
     }
 
     private func normalRandom(std: Double) -> Double {

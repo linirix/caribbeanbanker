@@ -183,13 +183,26 @@
       "laborMarketBonus": 6,
       "externalPositionBonus": 6
     },
+    "calibration": {
+      "shortMandateHeldBonus": 2,
+      "extendedMandateHeldBonus": 6,
+      "shortEnduranceBonusMax": 2,
+      "extendedEnduranceBonusMax": 6,
+      "difficultyPenaltyScale": {
+        "apprentice": 1.0,
+        "governor": 0.68,
+        "volcker": 0.52
+      },
+      "topEndCompressionThreshold": 70,
+      "topEndCompressionFactor": 0.6
+    },
     "headlineBands": [
-      { "minScore": 90, "label": "VOLCKER-CLASS OPERATOR" },
-      { "minScore": 75, "label": "Competent Technocrat" },
-      { "minScore": 60, "label": "Steady Hand, Choppy Decade" },
-      { "minScore": 45, "label": "Muddled Through" },
-      { "minScore": 30, "label": "Credibility in Tatters" },
-      { "minScore": 15, "label": "Accidental Arsonist" },
+      { "minScore": 95, "label": "VOLCKER-CLASS OPERATOR" },
+      { "minScore": 82, "label": "Competent Technocrat" },
+      { "minScore": 68, "label": "Steady Hand, Choppy Decade" },
+      { "minScore": 52, "label": "Muddled Through" },
+      { "minScore": 36, "label": "Credibility in Tatters" },
+      { "minScore": 18, "label": "Accidental Arsonist" },
       { "minScore": 0, "label": "Mandate in Ruins" }
     ]
   },

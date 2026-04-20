@@ -427,6 +427,22 @@ struct ScoreSuccessBonusConfig: Codable {
     var externalPositionBonus: Int
 }
 
+struct ScoreDifficultyPenaltyScaleConfig: Codable {
+    var apprentice: Double
+    var governor: Double
+    var volcker: Double
+}
+
+struct ScoreCalibrationConfig: Codable {
+    var shortMandateHeldBonus: Int
+    var extendedMandateHeldBonus: Int
+    var shortEnduranceBonusMax: Int
+    var extendedEnduranceBonusMax: Int
+    var difficultyPenaltyScale: ScoreDifficultyPenaltyScaleConfig
+    var topEndCompressionThreshold: Int
+    var topEndCompressionFactor: Double
+}
+
 struct ScoreHeadlineBand: Codable {
     var minScore: Int
     var label: String
@@ -440,6 +456,7 @@ struct ScoringConfig: Codable {
     var perQuarterPenalties: ScorePerQuarterPenaltyConfig
     var extremes: ScoreExtremeConfig
     var successBonuses: ScoreSuccessBonusConfig
+    var calibration: ScoreCalibrationConfig
     var headlineBands: [ScoreHeadlineBand]
 }
 
@@ -870,13 +887,24 @@ extension GameTuningConfig {
                 credibilityBonus: 8,
                 laborMarketBonus: 6,
                 externalPositionBonus: 6),
+            calibration: ScoreCalibrationConfig(
+                shortMandateHeldBonus: 2,
+                extendedMandateHeldBonus: 6,
+                shortEnduranceBonusMax: 2,
+                extendedEnduranceBonusMax: 6,
+                difficultyPenaltyScale: ScoreDifficultyPenaltyScaleConfig(
+                    apprentice: 1.0,
+                    governor: 0.68,
+                    volcker: 0.52),
+                topEndCompressionThreshold: 70,
+                topEndCompressionFactor: 0.6),
             headlineBands: [
-                ScoreHeadlineBand(minScore: 90, label: "VOLCKER-CLASS OPERATOR"),
-                ScoreHeadlineBand(minScore: 75, label: "Competent Technocrat"),
-                ScoreHeadlineBand(minScore: 60, label: "Steady Hand, Choppy Decade"),
-                ScoreHeadlineBand(minScore: 45, label: "Muddled Through"),
-                ScoreHeadlineBand(minScore: 30, label: "Credibility in Tatters"),
-                ScoreHeadlineBand(minScore: 15, label: "Accidental Arsonist"),
+                ScoreHeadlineBand(minScore: 95, label: "VOLCKER-CLASS OPERATOR"),
+                ScoreHeadlineBand(minScore: 82, label: "Competent Technocrat"),
+                ScoreHeadlineBand(minScore: 68, label: "Steady Hand, Choppy Decade"),
+                ScoreHeadlineBand(minScore: 52, label: "Muddled Through"),
+                ScoreHeadlineBand(minScore: 36, label: "Credibility in Tatters"),
+                ScoreHeadlineBand(minScore: 18, label: "Accidental Arsonist"),
                 ScoreHeadlineBand(minScore: 0, label: "Mandate in Ruins")
             ]),
         cabinet: CabinetConfig(

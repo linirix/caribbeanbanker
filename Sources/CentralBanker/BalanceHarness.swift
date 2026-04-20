@@ -205,7 +205,8 @@ func runBalanceGame(gameLength: GameLength,
         if outcome != .ongoing {
             let score = computeScore(outcome: outcome,
                                      card: simulator.scoreCard,
-                                     gameLength: gameLength).final
+                                     gameLength: gameLength,
+                                     difficulty: difficulty).final
             return BalanceRunResult(
                 gameLength: gameLength,
                 mode: mode,
@@ -1299,6 +1300,7 @@ private func runValidationProfile(_ profile: ValidationProfile,
     let score = computeValidationScore(
         outcome: currentOutcome,
         simulator: session.simulator,
+        difficulty: difficulty,
         gameLength: profile.gameLength,
         horizonQuarters: profile.horizonQuarters
     )
@@ -1761,10 +1763,11 @@ private func validationProfiles() -> [ValidationProfile] {
 
 func computeValidationScore(outcome: GameOutcome,
                             simulator: EconomicSimulator,
+                            difficulty: Difficulty = .governor,
                             gameLength: GameLength,
                             horizonQuarters: Int) -> Int {
     let card = simulator.scoreCard
-    var score = computeScore(outcome: outcome, card: card, gameLength: gameLength).final
+    var score = computeScore(outcome: outcome, card: card, gameLength: gameLength, difficulty: difficulty).final
     guard outcome == .ongoing else { return score }
 
     let s = simulator.state
