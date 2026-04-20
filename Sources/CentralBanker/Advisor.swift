@@ -111,6 +111,21 @@ struct AdvisorBrief {
     let watchItems: [String]
 }
 
+struct AdvisorInstrumentGuidance {
+    let policyRateCenter: Double
+    let policyRateLower: Double
+    let policyRateUpper: Double
+    let reserveRequirementTarget: Double
+
+    var policyRateDashboardNote: String {
+        String(format: "adv %.1f%%", policyRateCenter * 100)
+    }
+
+    var reserveRequirementDashboardNote: String {
+        String(format: "adv %.1f%%", reserveRequirementTarget * 100)
+    }
+}
+
 func advisorBrief(for simulator: EconomicSimulator, topicText: String?) -> AdvisorBrief {
     let requested = AdvisorTopic.parse(topicText)
     let effectiveTopic = requested ?? .general
@@ -132,6 +147,17 @@ func advisorBrief(for simulator: EconomicSimulator, topicText: String?) -> Advis
         focusTitle: focusTopic.title,
         recommendations: focusPlan.recommendations,
         watchItems: focusPlan.watchItems
+    )
+}
+
+func advisorInstrumentGuidance(for simulator: EconomicSimulator) -> AdvisorInstrumentGuidance {
+    let rate = advisorRateRecommendation(for: simulator)
+    let reserve = advisorReserveRecommendation(for: simulator)
+    return AdvisorInstrumentGuidance(
+        policyRateCenter: rate.center,
+        policyRateLower: rate.lower,
+        policyRateUpper: rate.upper,
+        reserveRequirementTarget: reserve.target
     )
 }
 
@@ -234,7 +260,7 @@ private func advisorUrgencyMessage(for simulator: EconomicSimulator,
     }
 }
 
-private func advisorRateGuidance(for simulator: EconomicSimulator) -> (headline: String, detail: String) {
+private func advisorRateRecommendation(for simulator: EconomicSimulator) -> (center: Double, lower: Double, upper: Double) {
     let s = simulator.state
     let neutralNominal = max(0.04, s.expectedInflation) + simulator.params.outputGap.neutralRealRate
     let inflationGap = s.inflation - 0.04
@@ -257,10 +283,17 @@ private func advisorRateGuidance(for simulator: EconomicSimulator) -> (headline:
     let lower = max(0.0, center - width)
     let upper = min(0.25, center + width)
 
+    return (center, lower, upper)
+}
+
+private func advisorRateGuidance(for simulator: EconomicSimulator) -> (headline: String, detail: String) {
+    let s = simulator.state
+    let range = advisorRateRecommendation(for: simulator)
+
     let headline: String
-    if center > s.policyRate + 0.0075 {
+    if range.center > s.policyRate + 0.0075 {
         headline = "Rate bias: tighten."
-    } else if center < s.policyRate - 0.0075 {
+    } else if range.center < s.policyRate - 0.0075 {
         headline = "Rate bias: ease."
     } else {
         headline = "Rate bias: hold near current."
@@ -268,12 +301,52 @@ private func advisorRateGuidance(for simulator: EconomicSimulator) -> (headline:
 
     let detail = String(
         format: "Indicative policy-rate range: %.1f–%.1f%%. Current rate: %.1f%%. This is a staff heuristic based on inflation, activity, expectations, and external stress — not a perfect forecast.",
-        lower * 100,
-        upper * 100,
+        range.lower * 100,
+        range.upper * 100,
         s.policyRate * 100
     )
 
     return (headline, detail)
+}
+
+private func advisorReserveRecommendation(for simulator: EconomicSimulator) -> (target: Double, headline: String, detail: String) {
+    let s = simulator.state
+    var target = 0.12
+
+    if s.inflation > 0.10 && s.bankCreditGrowth > 0.14 {
+        target += 0.03
+    } else if s.inflation > 0.07 && s.bankCreditGrowth > 0.12 {
+        target += 0.015
+    }
+
+    if s.foreignReservesMonths < 2.2
+        && (s.capitalAccountGDP < -0.01 || s.exchangeRateQoQChange > 0.025) {
+        target += 0.015
+    }
+
+    if s.outputGap < -0.03 && s.inflation < 0.06 {
+        target -= 0.015
+    } else if s.outputGap < -0.015 && s.bankCreditGrowth < 0.07 && s.inflation < 0.05 {
+        target -= 0.010
+    }
+
+    target = min(0.22, max(0.08, target))
+
+    let headline: String
+    if target > s.reserveRequirement + 0.01 {
+        headline = "Reserve requirement bias: tighten modestly."
+    } else if target < s.reserveRequirement - 0.01 {
+        headline = "Reserve requirement bias: ease modestly."
+    } else {
+        headline = "Reserve requirement bias: broadly hold."
+    }
+
+    let detail = String(
+        format: "Indicative reserve-requirement target: %.1f%%. Use it to lean against hot credit or fragile external flows; it is a supporting lever, not the whole strategy.",
+        target * 100
+    )
+
+    return (target, headline, detail)
 }
 
 private func advisorRecommendations(for simulator: EconomicSimulator,

@@ -367,6 +367,25 @@ private func applyGlonzoBot(to simulator: EconomicSimulator) -> BalanceTurnStats
     }
 
     var stats = BalanceTurnStats()
+    let availableMeasures = simulator.availableCrisisMeasures().map(\.type)
+    if !availableMeasures.isEmpty
+        && Double.random(in: 0...1, using: &simulator.rng) < 0.20 {
+        let idx = Int.random(in: 0..<availableMeasures.count, using: &simulator.rng)
+        let measure = availableMeasures[idx]
+        _ = simulator.enactCrisisMeasure(measure)
+        stats.policyActions += 1
+        stats.activeQuarter = true
+        stats.crisisMeasuresUsed += 1
+        switch measure {
+        case .imfProgram:
+            stats.imfProgramsUsed += 1
+        case .bankHoliday:
+            stats.bankHolidaysUsed += 1
+        case .emergencyLiquidity:
+            stats.emergencyLiquidityUsed += 1
+        }
+    }
+
     let leverCount = Int.random(in: 0...2, using: &simulator.rng)
     guard leverCount > 0 else { return stats }
 

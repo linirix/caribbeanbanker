@@ -173,7 +173,12 @@ class EconomicSimulator {
             - p.money.creditReserveSensitivity * reserveGap)
 
         // --- Potential GDP ---
-        let potentialGrowthQ = p.outputGap.potentialGrowthAnnual / 4.0
+        let capitalControlsOverhang = max(0.0, s.capitalControls - p.outputGap.capitalControlsDragThreshold)
+        let potentialGrowthQ = max(
+            0.0,
+            p.outputGap.potentialGrowthAnnual / 4.0
+                - (p.outputGap.capitalControlsPotentialGrowthDrag * capitalControlsOverhang / 4.0)
+        )
         s.potentialGDP *= (1.0 + potentialGrowthQ)
 
         // --- Output gap (IS dynamics, quarterly) ---
@@ -183,6 +188,7 @@ class EconomicSimulator {
         let externalDemand = p.outputGap.externalDemand
             * (env.tradingPartnerGrowth / 4.0 - p.outputGap.partnerQuarterlyBaseline)
         let currentAccountSupport = p.outputGap.currentAccountSupport * s.currentAccountGDP
+        let controlsDemandDrag = p.outputGap.capitalControlsDemandDrag * capitalControlsOverhang
         demandNoiseCarry = p.outputGap.demandNoiseCarry * demandNoiseCarry
             + normalRandom(std: p.outputGap.demandNoiseStd)
         let prevGap = s.outputGap
@@ -192,6 +198,7 @@ class EconomicSimulator {
             + creditImpulse
             + externalDemand
             + currentAccountSupport
+            - controlsDemandDrag
             + demandNoiseCarry)
 
         let gdpGrowthQ = potentialGrowthQ + (s.outputGap - prevGap)
@@ -288,8 +295,12 @@ class EconomicSimulator {
         // --- Capital account ---
         let kaInterest = openness * p.capitalAccount.interestSensitivity * interestDiff
         let kaExpectations = openness * p.capitalAccount.expectationsSensitivity * erChange * 4.0
+        let controlsCapitalPenalty = max(0.0, s.capitalControls - p.capitalAccount.controlsPenaltyThreshold)
+            * p.capitalAccount.controlsPenalty
         let defenseFlowSupport = interventionSupportCarry * 0.85 + controlsReliefCarry
-        s.capitalAccountGDP = p.capitalAccount.bounds.clamping(kaInterest + kaExpectations + defenseFlowSupport)
+        s.capitalAccountGDP = p.capitalAccount.bounds.clamping(
+            kaInterest + kaExpectations + defenseFlowSupport - controlsCapitalPenalty
+        )
 
         // --- Foreign reserves ---
         // BOP surplus/deficit in months of imports

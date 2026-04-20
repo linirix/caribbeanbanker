@@ -236,7 +236,7 @@ private func renderMetric(_ metric: MetricDescriptor) -> String {
     case .plain:
         var value = color + metric.primaryValue + A.reset
         if let note = metric.note, !note.isEmpty {
-            value += " " + note
+            value += " " + metricNoteText(note, for: metric)
         }
         if let deltaText = metric.deltaText, !deltaText.isEmpty {
             value += " " + A.dim + deltaText + A.reset
@@ -250,6 +250,15 @@ private func renderMetric(_ metric: MetricDescriptor) -> String {
         let fillColor = severityColor(metric.severity)
         let chart = bar(metric.numericValue ?? 0.0, maxVal: maxValue, color: fillColor)
         return "  " + pad(metric.label + ":", to: 16) + chart + " " + color + metric.primaryValue + A.reset
+    }
+}
+
+private func metricNoteText(_ note: String, for metric: MetricDescriptor) -> String {
+    switch metric.id {
+    case "policy-rate", "reserve-requirement":
+        return A.dim + A.green + note + A.reset
+    default:
+        return note
     }
 }
 

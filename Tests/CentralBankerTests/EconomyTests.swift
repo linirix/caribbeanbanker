@@ -308,6 +308,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(rendered.contains("Yellow = relevant now."))
         XCTAssertTrue(rendered.contains("rate <x.x>"))
         XCTAssertTrue(rendered.contains("intervene <±x.x>"))
+        XCTAssertTrue(rendered.contains("adv "))
     }
 
     func testDashboardSnapshotReflectsCabinetAndCrisisAvailability() throws {
@@ -614,7 +615,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertGreaterThan(sim.crisisCooldownQuarters, 0)
     }
 
-    func testGlonzoBalanceBotIsDeterministicAndTouchesAtMostTwoLevers() {
+    func testGlonzoBalanceBotIsDeterministicAndTouchesAtMostTwoLeversPlusOptionalCrisisTool() {
         let a = EconomicSimulator(seed: testSeed)
         let b = EconomicSimulator(seed: testSeed)
 
@@ -622,15 +623,43 @@ final class EconomyTests: XCTestCase {
         let turnB = applyBalanceBotTurn(.glonzo, to: b)
 
         XCTAssertEqual(turnA.policyActions, turnB.policyActions)
-        XCTAssertLessThanOrEqual(turnA.policyActions, 2)
+        XCTAssertLessThanOrEqual(turnA.policyActions, 3)
         XCTAssertEqual(turnA.rateMoveAbs, turnB.rateMoveAbs, accuracy: 1e-12)
         XCTAssertEqual(turnA.reserveMoveAbs, turnB.reserveMoveAbs, accuracy: 1e-12)
         XCTAssertEqual(turnA.controlsMoveAbs, turnB.controlsMoveAbs, accuracy: 1e-12)
         XCTAssertEqual(turnA.interventionMonthsAbs, turnB.interventionMonthsAbs, accuracy: 1e-12)
+        XCTAssertEqual(turnA.crisisMeasuresUsed, turnB.crisisMeasuresUsed)
         XCTAssertEqual(a.state.policyRate, b.state.policyRate, accuracy: 1e-12)
         XCTAssertEqual(a.state.reserveRequirement, b.state.reserveRequirement, accuracy: 1e-12)
         XCTAssertEqual(a.state.capitalControls, b.state.capitalControls, accuracy: 1e-12)
         XCTAssertEqual(a.state.foreignReservesMonths, b.state.foreignReservesMonths, accuracy: 1e-12)
+    }
+
+    func testGlonzoBalanceBotRemainsDeterministicWhenCrisisToolsAreAvailable() {
+        let a = EconomicSimulator(seed: testSeed)
+        let b = EconomicSimulator(seed: testSeed)
+        for sim in [a, b] {
+            sim.state.unemployment = 0.10
+            sim.state.outputGap = -0.04
+            sim.state.foreignReservesMonths = 0.95
+            sim.state.exchangeRateQoQChange = 0.06
+            sim.state.capitalAccountGDP = -0.02
+            sim.state.externalDebtGDP = 0.82
+        }
+
+        XCTAssertFalse(a.availableCrisisMeasures().isEmpty)
+        XCTAssertFalse(b.availableCrisisMeasures().isEmpty)
+
+        let turnA = applyBalanceBotTurn(.glonzo, to: a)
+        let turnB = applyBalanceBotTurn(.glonzo, to: b)
+
+        XCTAssertEqual(turnA.policyActions, turnB.policyActions)
+        XCTAssertEqual(turnA.crisisMeasuresUsed, turnB.crisisMeasuresUsed)
+        XCTAssertEqual(turnA.imfProgramsUsed, turnB.imfProgramsUsed)
+        XCTAssertEqual(turnA.bankHolidaysUsed, turnB.bankHolidaysUsed)
+        XCTAssertEqual(turnA.emergencyLiquidityUsed, turnB.emergencyLiquidityUsed)
+        XCTAssertEqual(a.crisisCooldownQuarters, b.crisisCooldownQuarters)
+        XCTAssertLessThanOrEqual(turnA.policyActions, 3)
     }
 
     // MARK: - 2. Baseline sanity
@@ -1204,6 +1233,25 @@ final class EconomyTests: XCTestCase {
                           "Full capital controls should cost at least 5pp of public approval.")
         XCTAssertLessThan(locked.state.credibility, open.state.credibility - 0.02,
                           "Full capital controls should erode credibility over time.")
+    }
+
+    func testSustainedHeavyCapitalControlsReduceGrowthAndCapitalInflows() {
+        let moderate = EconomicSimulator(seed: testSeed)
+        let locked = EconomicSimulator(seed: testSeed)
+        moderate.state.capitalControls = 0.20
+        locked.state.capitalControls = 0.80
+
+        for _ in 0..<8 {
+            stepQuarter(moderate)
+            stepQuarter(locked)
+        }
+
+        XCTAssertLessThan(locked.state.capitalAccountGDP, moderate.state.capitalAccountGDP - 0.01,
+                          "Heavy controls should deter legitimate inflows over time, not just suppress outflows.")
+        XCTAssertLessThan(locked.state.annualizedGDPGrowth, moderate.state.annualizedGDPGrowth,
+                          "Sustained heavy controls should weigh on growth.")
+        XCTAssertLessThan(locked.state.potentialGDP, moderate.state.potentialGDP,
+                          "Persistent heavy controls should shave potential growth, not only current demand.")
     }
 
     // MARK: - 9. Sustained low inflation earns a credibility bonus

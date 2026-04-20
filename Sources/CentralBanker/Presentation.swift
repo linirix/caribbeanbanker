@@ -747,6 +747,7 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
     let crisisMeasures = simulator.availableCrisisMeasures()
     let hasCabinetRequest = simulator.activeCabinetRequest != nil
     let crisisMenuRelevant = !crisisMeasures.isEmpty || simulator.crisisCooldownQuarters > 0
+    let instrumentGuidance = advisorInstrumentGuidance(for: simulator)
     let cp = simulator.params.credibility
 
     let metricSections = [
@@ -771,8 +772,8 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
                         primaryValue: percentText(s.policyRate),
                         deltaText: nil,
                         trend: nil,
-                        severity: .neutral,
-                        note: nil,
+                        severity: .good,
+                        note: instrumentGuidance.policyRateDashboardNote,
                         numericValue: s.policyRate,
                         displayStyle: .plain)
                 ),
@@ -793,8 +794,8 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
                         primaryValue: percentText(s.reserveRequirement),
                         deltaText: nil,
                         trend: nil,
-                        severity: .neutral,
-                        note: nil,
+                        severity: .good,
+                        note: instrumentGuidance.reserveRequirementDashboardNote,
                         numericValue: s.reserveRequirement,
                         displayStyle: .plain)
                 ),

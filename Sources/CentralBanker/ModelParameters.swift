@@ -41,6 +41,12 @@ struct ModelParameters {
         var externalDemand: Double = 0.14
         var partnerQuarterlyBaseline: Double = 0.01
         var currentAccountSupport: Double = 0.08
+        // Heavy, sustained capital controls distort investment and trade
+        // finance. Below the threshold they are mostly a crisis-management
+        // tool; above it they start shaving cyclical demand and trend growth.
+        var capitalControlsDragThreshold: Double = 0.45
+        var capitalControlsDemandDrag: Double = 0.018
+        var capitalControlsPotentialGrowthDrag: Double = 0.012
         var demandNoiseCarry: Double = 0.45
         var demandNoiseStd: Double = 0.004
         var bounds: ClosedRange<Double> = -0.12 ... 0.09
@@ -118,6 +124,10 @@ struct ModelParameters {
     struct CapitalAccount {
         var interestSensitivity: Double = 0.45
         var expectationsSensitivity: Double = -0.55
+        // Beyond a moderate threshold, controls deter legitimate inflows as
+        // well as panic outflows, making them weaker as a permanent setting.
+        var controlsPenaltyThreshold: Double = 0.45
+        var controlsPenalty: Double = 0.08
         var bounds: ClosedRange<Double> = -0.15 ... 0.14
     }
 
