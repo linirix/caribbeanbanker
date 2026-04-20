@@ -4,12 +4,14 @@ enum BalanceBot: String, CaseIterable, Codable {
     case passive
     case rateOnly = "rate_only"
     case fullReactive = "full_reactive"
+    case glonzo
 
     var displayName: String {
         switch self {
         case .passive: return "Passive"
         case .rateOnly: return "RateOnly"
         case .fullReactive: return "FullReactive"
+        case .glonzo: return "Glonzo"
         }
     }
 }
@@ -236,6 +238,8 @@ func applyBalanceBotTurn(_ bot: BalanceBot,
         return applyRateOnlyBot(to: simulator)
     case .fullReactive:
         return applyFullReactiveBot(to: simulator)
+    case .glonzo:
+        return applyGlonzoBot(to: simulator)
     }
 }
 
@@ -354,6 +358,61 @@ private func applyFullReactiveBot(to simulator: EconomicSimulator) -> BalanceTur
     return stats
 }
 
+private func applyGlonzoBot(to simulator: EconomicSimulator) -> BalanceTurnStats {
+    enum GlonzoLever: CaseIterable {
+        case rate
+        case reserveRequirement
+        case controls
+        case intervention
+    }
+
+    var stats = BalanceTurnStats()
+    let leverCount = Int.random(in: 0...2, using: &simulator.rng)
+    guard leverCount > 0 else { return stats }
+
+    var levers = GlonzoLever.allCases
+    levers.shuffle(using: &simulator.rng)
+
+    for lever in levers.prefix(leverCount) {
+        switch lever {
+        case .rate:
+            let delta = Double.random(in: -0.035...0.035, using: &simulator.rng)
+            let nextRate = (0.0...0.28).clamping(simulator.state.policyRate + delta)
+            let move = abs(nextRate - simulator.state.policyRate)
+            guard move > 0.0001 else { continue }
+            simulator.state.policyRate = nextRate
+            stats.rateMoveAbs += move
+
+        case .reserveRequirement:
+            let delta = Double.random(in: -0.04...0.04, using: &simulator.rng)
+            let nextReserve = (0.05...0.25).clamping(simulator.state.reserveRequirement + delta)
+            let move = abs(nextReserve - simulator.state.reserveRequirement)
+            guard move > 0.0001 else { continue }
+            simulator.state.reserveRequirement = nextReserve
+            stats.reserveMoveAbs += move
+
+        case .controls:
+            let delta = Double.random(in: -0.22...0.22, using: &simulator.rng)
+            let nextControls = (0.0...1.0).clamping(simulator.state.capitalControls + delta)
+            let move = abs(nextControls - simulator.state.capitalControls)
+            guard move > 0.0001 else { continue }
+            simulator.setCapitalControls(nextControls)
+            stats.controlsMoveAbs += move
+
+        case .intervention:
+            let sign = Bool.random(using: &simulator.rng) ? 1.0 : -1.0
+            let months = sign * Double.random(in: 0.15...0.75, using: &simulator.rng)
+            simulator.applyFXIntervention(months: months)
+            stats.interventionMonthsAbs += abs(months)
+        }
+
+        stats.policyActions += 1
+        stats.activeQuarter = true
+    }
+
+    return stats
+}
+
 private func maybeUseCrisisMeasure(on simulator: EconomicSimulator,
                                    stats: inout BalanceTurnStats) {
     let available = Set(simulator.availableCrisisMeasures().map(\.type))
@@ -434,6 +493,9 @@ private func resolveCabinetDemand(for bot: BalanceBot,
     let acted: Bool
     switch bot {
     case .passive:
+        acted = false
+
+    case .glonzo:
         acted = false
 
     case .rateOnly:

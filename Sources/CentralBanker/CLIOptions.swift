@@ -72,7 +72,7 @@ Usage: CentralBanker [options]
   --scenario <id>        Start a historical scenario by id.
   --balance              Run the headless balance harness instead of the game.
   --runs <int>           Runs per balance cell (default: 100).
-  --bot <name>           Limit balance harness to passive, rate_only, or full_reactive.
+  --bot <name>           Limit balance harness to passive, rate_only, full_reactive, or glonzo.
   --report <path>        Write balance results as JSON when running --balance.
   --help                 Show this message.
 """
@@ -131,10 +131,10 @@ func parseCLIArgs(_ rawArgs: [String] = CommandLine.arguments) throws -> CLIOpti
             options.runs = v
             continue
         case "--bot":
-            let raw = try consumeArg(flag: "--bot", expected: "passive|rate_only|full_reactive")
+            let raw = try consumeArg(flag: "--bot", expected: "passive|rate_only|full_reactive|glonzo")
             guard let bot = BalanceBot(rawValue: raw.lowercased()) else {
                 throw CLIParseError.invalidValue(
-                    flag: "--bot", got: raw, expected: "passive, rate_only, or full_reactive")
+                    flag: "--bot", got: raw, expected: "passive, rate_only, full_reactive, or glonzo")
             }
             options.bot = bot
             continue

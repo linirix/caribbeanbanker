@@ -141,6 +141,12 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(options.scenarioID, "oil_shock_1973")
     }
 
+    func testCLIParsesGlonzoBalanceBot() throws {
+        let options = try parseCLIArgs(["CentralBanker", "--balance", "--bot", "glonzo"])
+        XCTAssertTrue(options.balance)
+        XCTAssertEqual(options.bot, .glonzo)
+    }
+
     // The whole point of moving parsing to a pure throwing function is that
     // invalid input can be asserted on directly — no stdio mocking, no
     // process-exit side effect. These pin that contract.
@@ -606,6 +612,25 @@ final class EconomyTests: XCTestCase {
         XCTAssertGreaterThan(turn.crisisMeasuresUsed, 0,
                              "Full reactive bot should use a crisis tool when one is available under acute stress.")
         XCTAssertGreaterThan(sim.crisisCooldownQuarters, 0)
+    }
+
+    func testGlonzoBalanceBotIsDeterministicAndTouchesAtMostTwoLevers() {
+        let a = EconomicSimulator(seed: testSeed)
+        let b = EconomicSimulator(seed: testSeed)
+
+        let turnA = applyBalanceBotTurn(.glonzo, to: a)
+        let turnB = applyBalanceBotTurn(.glonzo, to: b)
+
+        XCTAssertEqual(turnA.policyActions, turnB.policyActions)
+        XCTAssertLessThanOrEqual(turnA.policyActions, 2)
+        XCTAssertEqual(turnA.rateMoveAbs, turnB.rateMoveAbs, accuracy: 1e-12)
+        XCTAssertEqual(turnA.reserveMoveAbs, turnB.reserveMoveAbs, accuracy: 1e-12)
+        XCTAssertEqual(turnA.controlsMoveAbs, turnB.controlsMoveAbs, accuracy: 1e-12)
+        XCTAssertEqual(turnA.interventionMonthsAbs, turnB.interventionMonthsAbs, accuracy: 1e-12)
+        XCTAssertEqual(a.state.policyRate, b.state.policyRate, accuracy: 1e-12)
+        XCTAssertEqual(a.state.reserveRequirement, b.state.reserveRequirement, accuracy: 1e-12)
+        XCTAssertEqual(a.state.capitalControls, b.state.capitalControls, accuracy: 1e-12)
+        XCTAssertEqual(a.state.foreignReservesMonths, b.state.foreignReservesMonths, accuracy: 1e-12)
     }
 
     // MARK: - 2. Baseline sanity
