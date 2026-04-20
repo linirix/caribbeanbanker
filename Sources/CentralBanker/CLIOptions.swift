@@ -74,7 +74,8 @@ Usage: CentralBanker [options]
   --balance              Run the headless balance harness instead of the game.
   --validate-model       Run the expectation-based model-validation sweep.
   --runs <int>           Runs per balance cell (default: 100).
-  --bot <name>           Limit balance harness to passive, rate_only, full_reactive, or glonzo.
+  --bot <name>           Limit balance harness to passive, rate_only, full_reactive,
+                         hawkish, balanced, dovish, or glonzo.
   --report <path>        Write harness results as JSON when running --balance or --validate-model.
   --help                 Show this message.
 """
@@ -135,10 +136,10 @@ func parseCLIArgs(_ rawArgs: [String] = CommandLine.arguments) throws -> CLIOpti
             options.runs = v
             continue
         case "--bot":
-            let raw = try consumeArg(flag: "--bot", expected: "passive|rate_only|full_reactive|glonzo")
+            let raw = try consumeArg(flag: "--bot", expected: "passive|rate_only|full_reactive|hawkish|balanced|dovish|glonzo")
             guard let bot = BalanceBot(rawValue: raw.lowercased()) else {
                 throw CLIParseError.invalidValue(
-                    flag: "--bot", got: raw, expected: "passive, rate_only, full_reactive, or glonzo")
+                    flag: "--bot", got: raw, expected: "passive, rate_only, full_reactive, hawkish, balanced, dovish, or glonzo")
             }
             options.bot = bot
             continue

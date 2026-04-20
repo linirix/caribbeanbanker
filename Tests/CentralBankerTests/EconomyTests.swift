@@ -147,6 +147,12 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(options.bot, .glonzo)
     }
 
+    func testCLIParsesHawkishBalanceBot() throws {
+        let options = try parseCLIArgs(["CentralBanker", "--balance", "--bot", "hawkish"])
+        XCTAssertTrue(options.balance)
+        XCTAssertEqual(options.bot, .hawkish)
+    }
+
     func testCLIParsesValidationFlag() throws {
         let options = try parseCLIArgs(["CentralBanker", "--validate-model", "--bot", "full_reactive"])
         XCTAssertTrue(options.validateModel)
@@ -774,6 +780,89 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(turnA.emergencyLiquidityUsed, turnB.emergencyLiquidityUsed)
         XCTAssertEqual(a.crisisCooldownQuarters, b.crisisCooldownQuarters)
         XCTAssertLessThanOrEqual(turnA.policyActions, 3)
+    }
+
+    func testHawkishStyleBotCommunicatesHawkishlyAndTightensInHotConditions() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.110
+        sim.state.expectedInflation = 0.090
+        sim.state.outputGap = 0.020
+        sim.state.policyRate = 0.060
+        sim.state.exchangeRateQoQChange = 0.020
+
+        let turn = applyBalanceBotTurn(.hawkish, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertGreaterThan(sim.state.policyRate, 0.060)
+        XCTAssertEqual(sim.communicationStance, .hawkish)
+    }
+
+    func testDovishStyleBotCutsRatesAndUsesDovishCommunicationInRecession() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.055
+        sim.state.expectedInflation = 0.052
+        sim.state.outputGap = -0.035
+        sim.state.policyRate = 0.085
+        sim.state.exchangeRateQoQChange = 0.005
+
+        let turn = applyBalanceBotTurn(.dovish, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertLessThan(sim.state.policyRate, 0.085)
+        XCTAssertEqual(sim.communicationStance, .dovish)
+    }
+
+    func testDovishStyleBotDefendsExternalSideBeforeFullPanic() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.078
+        sim.state.expectedInflation = 0.070
+        sim.state.outputGap = -0.006
+        sim.state.policyRate = 0.060
+        sim.state.foreignReservesMonths = 2.25
+        sim.state.currentAccountGDP = -0.038
+        sim.state.exchangeRateQoQChange = 0.023
+        sim.state.capitalControls = 0.18
+
+        let priorControls = sim.state.capitalControls
+        let turn = applyBalanceBotTurn(.dovish, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertEqual(sim.communicationStance, .balanced)
+        XCTAssertTrue(turn.interventionMonthsAbs > 0.0 || sim.state.capitalControls > priorControls)
+    }
+
+    func testBalancedStyleBotDefaultsToBalancedCommunicationInCalmConditions() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.060
+        sim.state.expectedInflation = 0.058
+        sim.state.outputGap = -0.005
+        sim.state.policyRate = 0.070
+        sim.state.exchangeRateQoQChange = 0.010
+        sim.communicationStance = .hawkish
+
+        let turn = applyBalanceBotTurn(.balanced, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertEqual(sim.communicationStance, .balanced)
+    }
+
+    func testHawkishStyleBotDoesNotUseBankHolidayForModerateExternalStress() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.070
+        sim.state.expectedInflation = 0.062
+        sim.state.outputGap = 0.004
+        sim.state.policyRate = 0.080
+        sim.state.foreignReservesMonths = 1.20
+        sim.state.currentAccountGDP = -0.040
+        sim.state.capitalAccountGDP = -0.012
+        sim.state.exchangeRateQoQChange = 0.045
+
+        XCTAssertTrue(sim.availableCrisisMeasures().contains(where: { $0.type == .bankHoliday }))
+
+        let turn = applyBalanceBotTurn(.hawkish, to: sim)
+
+        XCTAssertEqual(turn.bankHolidaysUsed, 0)
+        XCTAssertEqual(sim.crisisCooldownQuarters, 0)
     }
 
     // MARK: - 2. Baseline sanity

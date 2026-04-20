@@ -4,6 +4,9 @@ enum BalanceBot: String, CaseIterable, Codable {
     case passive
     case rateOnly = "rate_only"
     case fullReactive = "full_reactive"
+    case hawkish
+    case balanced
+    case dovish
     case glonzo
 
     var displayName: String {
@@ -11,6 +14,9 @@ enum BalanceBot: String, CaseIterable, Codable {
         case .passive: return "Passive"
         case .rateOnly: return "RateOnly"
         case .fullReactive: return "FullReactive"
+        case .hawkish: return "Hawkish"
+        case .balanced: return "Balanced"
+        case .dovish: return "Dovish"
         case .glonzo: return "Glonzo"
         }
     }
@@ -238,9 +244,21 @@ func applyBalanceBotTurn(_ bot: BalanceBot,
         return applyRateOnlyBot(to: simulator)
     case .fullReactive:
         return applyFullReactiveBot(to: simulator)
+    case .hawkish:
+        return applyStyleBot(.hawkish, to: simulator)
+    case .balanced:
+        return applyStyleBot(.balanced, to: simulator)
+    case .dovish:
+        return applyStyleBot(.dovish, to: simulator)
     case .glonzo:
         return applyGlonzoBot(to: simulator)
     }
+}
+
+private enum PolicyStyle {
+    case hawkish
+    case balanced
+    case dovish
 }
 
 private func applyRateOnlyBot(to simulator: EconomicSimulator) -> BalanceTurnStats {
@@ -455,6 +473,238 @@ private func applyGlonzoBot(to simulator: EconomicSimulator) -> BalanceTurnStats
     return stats
 }
 
+private func applyStyleBot(_ style: PolicyStyle,
+                           to simulator: EconomicSimulator) -> BalanceTurnStats {
+    var stats = BalanceTurnStats()
+    maybeUseCrisisMeasure(style: style, on: simulator, stats: &stats)
+    let s = simulator.state
+
+    let inflationTarget: Double
+    let inflationWeight: Double
+    let outputWeight: Double
+    let reserveWeight: Double
+    let fxWeight: Double
+    let maxRateStep: Double
+    let rateDeadband: Double
+
+    switch style {
+    case .hawkish:
+        inflationTarget = 0.045
+        inflationWeight = 1.60
+        outputWeight = 0.45
+        reserveWeight = 0.012
+        fxWeight = 0.90
+        maxRateStep = 0.015
+        rateDeadband = 0.008
+    case .balanced:
+        inflationTarget = 0.050
+        inflationWeight = 1.20
+        outputWeight = 0.40
+        reserveWeight = 0.010
+        fxWeight = 0.65
+        maxRateStep = 0.012
+        rateDeadband = 0.008
+    case .dovish:
+        inflationTarget = 0.055
+        inflationWeight = 1.15
+        outputWeight = 0.75
+        reserveWeight = 0.012
+        fxWeight = 0.70
+        maxRateStep = 0.012
+        rateDeadband = 0.007
+    }
+
+    let neutralNominal = simulator.params.outputGap.neutralRealRate + inflationTarget
+    let reserveStressFloor: Double = style == .dovish ? 2.3 : 2.7
+    let reserveStress = max(0.0, reserveStressFloor - s.foreignReservesMonths) * reserveWeight
+    let fxStressTrigger: Double
+    switch style {
+    case .hawkish: fxStressTrigger = 0.010
+    case .balanced: fxStressTrigger = 0.015
+    case .dovish: fxStressTrigger = 0.020
+    }
+    let fxStress = max(0.0, s.exchangeRateQoQChange - fxStressTrigger) * fxWeight
+
+    var targetRate = neutralNominal
+        + inflationWeight * (s.inflation - inflationTarget)
+        + outputWeight * s.outputGap
+        + reserveStress
+        + fxStress
+
+    if style == .dovish && s.outputGap < -0.03 && s.inflation < 0.075 {
+        targetRate -= 0.010
+    }
+    if style == .dovish && (s.inflation > 0.085 || s.exchangeRateQoQChange > 0.030) {
+        targetRate += 0.015
+    }
+    if style == .dovish && (s.inflation > 0.10 || s.exchangeRateQoQChange > 0.040) {
+        targetRate += 0.010
+    }
+    if style == .hawkish && s.inflation > 0.10 && s.outputGap > 0.01 {
+        targetRate += 0.010
+    }
+
+    adjustPolicyRate(on: simulator,
+                     toward: (0.0...0.28).clamping(targetRate),
+                     maxStep: maxRateStep,
+                     deadband: rateDeadband,
+                     stats: &stats)
+
+    switch style {
+    case .hawkish:
+        if simulator.state.inflation > 0.08
+            && simulator.state.bankCreditGrowth > 0.11
+            && simulator.state.reserveRequirement < 0.24 {
+            let desired = (0.06...0.26).clamping(simulator.state.reserveRequirement + 0.03)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.03, deadband: 0.010, stats: &stats)
+        } else if simulator.state.outputGap < -0.05
+                    && simulator.state.inflation < 0.05
+                    && simulator.state.reserveRequirement > 0.10 {
+            let desired = max(0.10, simulator.state.reserveRequirement - 0.02)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.02, deadband: 0.010, stats: &stats)
+        }
+
+    case .balanced:
+        if simulator.state.inflation > 0.09
+            && simulator.state.bankCreditGrowth > 0.13
+            && simulator.state.reserveRequirement < 0.20 {
+            let desired = (0.06...0.22).clamping(simulator.state.reserveRequirement + 0.02)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.02, deadband: 0.010, stats: &stats)
+        } else if simulator.state.outputGap < -0.04
+                    && simulator.state.inflation < 0.06
+                    && simulator.state.reserveRequirement > 0.10 {
+            let desired = max(0.10, simulator.state.reserveRequirement - 0.02)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.02, deadband: 0.010, stats: &stats)
+        }
+
+    case .dovish:
+        if simulator.state.inflation > 0.11
+            && simulator.state.bankCreditGrowth > 0.15
+            && simulator.state.exchangeRateQoQChange > 0.018
+            && simulator.state.reserveRequirement < 0.20 {
+            let desired = (0.06...0.22).clamping(simulator.state.reserveRequirement + 0.02)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.02, deadband: 0.010, stats: &stats)
+        } else if simulator.state.outputGap < -0.02
+                    && simulator.state.inflation < 0.075
+                    && simulator.state.reserveRequirement > 0.08 {
+            let desired = max(0.08, simulator.state.reserveRequirement - 0.02)
+            adjustReserveRequirement(on: simulator, toward: desired, maxStep: 0.02, deadband: 0.010, stats: &stats)
+        }
+    }
+
+    let controlsCeiling: Double
+    switch style {
+    case .hawkish: controlsCeiling = simulator.state.foreignReservesMonths > 1.8 ? 0.45 : 0.70
+    case .balanced: controlsCeiling = simulator.state.foreignReservesMonths > 1.8 ? 0.35 : 0.70
+    case .dovish: controlsCeiling = simulator.state.foreignReservesMonths > 1.8 ? 0.40 : 0.60
+    }
+    let needsExternalDefense = simulator.state.exchangeRateQoQChange > (style == .hawkish ? 0.015 : style == .balanced ? 0.018 : 0.014)
+        || simulator.state.foreignReservesMonths < (style == .dovish ? 2.1 : 2.2)
+        || simulator.state.currentAccountGDP < (style == .hawkish ? -0.02 : -0.03)
+
+    if needsExternalDefense && simulator.state.capitalControls < controlsCeiling {
+        let move: Double
+        switch style {
+        case .hawkish:
+            move = min(0.10, controlsCeiling - simulator.state.capitalControls)
+        case .balanced:
+            move = min(0.07, controlsCeiling - simulator.state.capitalControls)
+        case .dovish:
+            move = min(0.08, controlsCeiling - simulator.state.capitalControls)
+        }
+        if move > 0 {
+            simulator.setCapitalControls(simulator.state.capitalControls + move)
+            stats.controlsMoveAbs += move
+            stats.policyActions += 1
+            stats.activeQuarter = true
+        }
+    } else if simulator.state.foreignReservesMonths > 4.5
+                && simulator.state.inflation < 0.07
+                && simulator.state.capitalControls > (style == .hawkish ? 0.20 : 0.10) {
+        let unwind = min(style == .hawkish ? 0.06 : 0.08, simulator.state.capitalControls)
+        if unwind > 0 {
+            simulator.setCapitalControls(simulator.state.capitalControls - unwind)
+            stats.controlsMoveAbs += unwind
+            stats.policyActions += 1
+            stats.activeQuarter = true
+        }
+    }
+
+    let interventionMonths: Double
+    switch style {
+    case .hawkish:
+        if simulator.state.foreignReservesMonths > 2.0 && simulator.state.exchangeRateQoQChange > 0.020 {
+            interventionMonths = -min(0.45, simulator.state.foreignReservesMonths - 1.2)
+        } else if simulator.state.foreignReservesMonths > 1.4 && simulator.state.exchangeRateQoQChange > 0.040 {
+            interventionMonths = -min(0.30, simulator.state.foreignReservesMonths - 1.0)
+        } else {
+            interventionMonths = 0.0
+        }
+    case .balanced:
+        if simulator.state.foreignReservesMonths > 2.2 && simulator.state.exchangeRateQoQChange > 0.028 {
+            interventionMonths = -min(0.35, simulator.state.foreignReservesMonths - 1.2)
+        } else if simulator.state.foreignReservesMonths > 4.5
+                    && simulator.state.currentAccountGDP > 0.01
+                    && simulator.state.exchangeRateQoQChange < -0.03 {
+            interventionMonths = 0.25
+        } else {
+            interventionMonths = 0.0
+        }
+    case .dovish:
+        if simulator.state.foreignReservesMonths > 2.0 && simulator.state.exchangeRateQoQChange > 0.025 {
+            interventionMonths = -min(0.30, simulator.state.foreignReservesMonths - 1.3)
+        } else if simulator.state.foreignReservesMonths > 1.6 && simulator.state.exchangeRateQoQChange > 0.040 {
+            interventionMonths = -min(0.22, simulator.state.foreignReservesMonths - 1.1)
+        } else {
+            interventionMonths = 0.0
+        }
+    }
+    if abs(interventionMonths) > 0.0001 {
+        simulator.applyFXIntervention(months: interventionMonths)
+        stats.interventionMonthsAbs += abs(interventionMonths)
+        stats.policyActions += 1
+        stats.activeQuarter = true
+    }
+
+    let nextStance: CommunicationStance
+    switch style {
+    case .hawkish:
+        if simulator.state.inflation > 0.06 || simulator.state.exchangeRateQoQChange > 0.015 {
+            nextStance = .hawkish
+        } else if simulator.state.outputGap < -0.05 && simulator.state.inflation < 0.05 {
+            nextStance = .balanced
+        } else {
+            nextStance = .balanced
+        }
+    case .balanced:
+        if simulator.state.inflation > 0.09 || simulator.state.exchangeRateQoQChange > 0.030 {
+            nextStance = .hawkish
+        } else if simulator.state.outputGap < -0.045 && simulator.state.inflation < 0.055 {
+            nextStance = .dovish
+        } else {
+            nextStance = .balanced
+        }
+    case .dovish:
+        if simulator.state.inflation > 0.12 || simulator.state.exchangeRateQoQChange > 0.050 {
+            nextStance = .hawkish
+        } else if simulator.state.inflation > 0.085 || simulator.state.exchangeRateQoQChange > 0.025 {
+            nextStance = .balanced
+        } else if simulator.state.outputGap < -0.015 && simulator.state.inflation < 0.07 {
+            nextStance = .dovish
+        } else {
+            nextStance = .balanced
+        }
+    }
+    if simulator.communicationStance != nextStance {
+        simulator.communicationStance = nextStance
+        stats.policyActions += 1
+        stats.activeQuarter = true
+    }
+
+    resolveCabinetDemand(for: style, simulator: simulator, stats: &stats)
+    return stats
+}
+
 private func maybeUseCrisisMeasure(on simulator: EconomicSimulator,
                                    stats: inout BalanceTurnStats) {
     let available = Set(simulator.availableCrisisMeasures().map(\.type))
@@ -482,6 +732,83 @@ private func maybeUseCrisisMeasure(on simulator: EconomicSimulator,
         chosen = .imfProgram
     } else {
         chosen = nil
+    }
+
+    guard let measure = chosen else { return }
+    _ = simulator.enactCrisisMeasure(measure)
+    stats.policyActions += 1
+    stats.activeQuarter = true
+    stats.crisisMeasuresUsed += 1
+    switch measure {
+    case .imfProgram:
+        stats.imfProgramsUsed += 1
+    case .bankHoliday:
+        stats.bankHolidaysUsed += 1
+    case .emergencyLiquidity:
+        stats.emergencyLiquidityUsed += 1
+    }
+}
+
+private func maybeUseCrisisMeasure(style: PolicyStyle,
+                                   on simulator: EconomicSimulator,
+                                   stats: inout BalanceTurnStats) {
+    let available = Set(simulator.availableCrisisMeasures().map(\.type))
+    guard !available.isEmpty else { return }
+
+    let s = simulator.state
+    let chosen: CrisisMeasureType?
+
+    switch style {
+    case .hawkish:
+        if available.contains(.bankHoliday)
+            && (s.foreignReservesMonths < 0.60
+                || (s.exchangeRateQoQChange > 0.075
+                    && s.capitalAccountGDP < -0.015
+                    && s.currentAccountGDP < -0.045)) {
+            chosen = .bankHoliday
+        } else if available.contains(.imfProgram)
+                    && (s.foreignReservesMonths < 0.60
+                        || (s.foreignReservesMonths < 0.90
+                            && s.currentAccountGDP < -0.060
+                            && s.exchangeRateQoQChange > 0.060)
+                        || s.externalDebtGDP > 1.05) {
+            chosen = .imfProgram
+        } else if available.contains(.emergencyLiquidity)
+                    && s.outputGap < -0.040
+                    && s.unemployment > 0.095
+                    && s.inflation < 0.080 {
+            chosen = .emergencyLiquidity
+        } else {
+            chosen = nil
+        }
+
+    case .balanced:
+        return maybeUseCrisisMeasure(on: simulator, stats: &stats)
+
+    case .dovish:
+        if available.contains(.emergencyLiquidity)
+            && s.outputGap < -0.022
+            && s.unemployment > 0.082
+            && s.inflation < 0.095
+            && s.foreignReservesMonths > 1.0
+            && s.exchangeRateQoQChange < 0.045 {
+            chosen = .emergencyLiquidity
+        } else if available.contains(.bankHoliday)
+                    && (s.foreignReservesMonths < 0.90
+                        || (s.exchangeRateQoQChange > 0.050
+                            && s.capitalAccountGDP < -0.010
+                            && s.currentAccountGDP < -0.040)) {
+            chosen = .bankHoliday
+        } else if available.contains(.imfProgram)
+                    && (s.foreignReservesMonths < 1.00
+                        || (s.foreignReservesMonths < 1.20
+                            && s.currentAccountGDP < -0.045
+                            && s.exchangeRateQoQChange > 0.040)
+                        || s.externalDebtGDP > 0.85) {
+            chosen = .imfProgram
+        } else {
+            chosen = nil
+        }
     }
 
     guard let measure = chosen else { return }
@@ -540,6 +867,9 @@ private func resolveCabinetDemand(for bot: BalanceBot,
     case .glonzo:
         acted = false
 
+    case .hawkish, .balanced, .dovish:
+        acted = false
+
     case .rateOnly:
         switch request.type {
         case .cutRates:
@@ -568,6 +898,69 @@ private func resolveCabinetDemand(for bot: BalanceBot,
             acted = resolveCabinet(simulator,
                                    accept: simulator.state.foreignReservesMonths > 1.6
                                         && simulator.state.exchangeRateQoQChange > 0.01)
+        }
+    }
+
+    if acted {
+        stats.policyActions += 1
+        stats.activeQuarter = true
+    }
+}
+
+private func resolveCabinetDemand(for style: PolicyStyle,
+                                  simulator: EconomicSimulator,
+                                  stats: inout BalanceTurnStats) {
+    guard let request = simulator.activeCabinetRequest else { return }
+
+    let acted: Bool
+    switch style {
+    case .hawkish:
+        switch request.type {
+        case .cutRates:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.inflation < 0.05
+                                        && simulator.state.outputGap < -0.04
+                                        && simulator.state.foreignReservesMonths > 2.0)
+        case .tightenControls:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths < 3.2
+                                        || simulator.state.exchangeRateQoQChange > 0.012)
+        case .defendCurrency:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths > 1.4)
+        }
+
+    case .balanced:
+        switch request.type {
+        case .cutRates:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.inflation < 0.065
+                                        && simulator.state.outputGap < -0.025
+                                        && simulator.state.foreignReservesMonths > 2.0)
+        case .tightenControls:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths < 2.6
+                                        || simulator.state.exchangeRateQoQChange > 0.020)
+        case .defendCurrency:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths > 1.5
+                                        && simulator.state.exchangeRateQoQChange > 0.012)
+        }
+
+    case .dovish:
+        switch request.type {
+        case .cutRates:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.inflation < 0.085
+                                        || simulator.state.outputGap < -0.015)
+        case .tightenControls:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths < 2.0
+                                        && simulator.state.exchangeRateQoQChange > 0.020)
+        case .defendCurrency:
+            acted = resolveCabinet(simulator,
+                                   accept: simulator.state.foreignReservesMonths > 1.7
+                                        && simulator.state.exchangeRateQoQChange > 0.018)
         }
     }
 
