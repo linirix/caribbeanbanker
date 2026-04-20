@@ -1,0 +1,24 @@
+{
+  "scriptedEvents": [
+    { "quarter": "Q4 1973", "events": [ { "kind": "oilShock", "value": 3.0 } ] },
+    { "quarter": "Q1 1974", "events": [ { "kind": "tradingPartnerRecession", "value": 0.03 } ] },
+    { "quarter": "Q2 1974", "events": [ { "kind": "imfReview" } ] },
+    { "quarter": "Q2 1975", "events": [ { "kind": "tradingPartnerRecovery" } ] },
+    { "quarter": "Q1 1976", "events": [ { "kind": "debtRefinancing" } ] },
+    { "quarter": "Q3 1977", "events": [ { "kind": "imfReview" } ] },
+    { "quarter": "Q1 1979", "events": [ { "kind": "oilShock", "value": 1.4 } ] },
+    { "quarter": "Q3 1979", "events": [ { "kind": "debtRefinancing" } ] },
+    { "quarter": "Q1 1980", "events": [ { "kind": "tradingPartnerRecession", "value": 0.025 } ] },
+    { "quarter": "Q3 1980", "events": [ { "kind": "imfReview" } ] },
+    { "quarter": "Q2 1981", "events": [ { "kind": "oilRecovery", "value": 0.2 } ] }
+  ],
+  "worldRates": [
+    { "startYear": 0, "endYear": 1974, "rate": 0.06 },
+    { "startYear": 1975, "endYear": 1977, "rate": 0.065 },
+    { "startYear": 1978, "endYear": 1978, "rate": 0.075 },
+    { "startYear": 1979, "endYear": 1979, "rate": 0.11 },
+    { "startYear": 1980, "endYear": 1980, "rate": 0.135 },
+    { "startYear": 1981, "endYear": 1981, "rate": 0.155 },
+    { "startYear": 1982, "endYear": 3000, "rate": 0.13 }
+  ]
+}

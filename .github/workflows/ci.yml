@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Run test suite
+        run: SDKROOT=$(xcrun --show-sdk-path) swift test
+
+      - name: Smoke-test CLI help
+        run: SDKROOT=$(xcrun --show-sdk-path) swift run CentralBanker --help
+
+      - name: Build release package
+        run: ./scripts/package_release.sh
+
+      - name: Smoke-test packaged release
+        run: ./scripts/smoke_release_bundle.sh "$(ls -td dist/CentralBanker-* | head -n 1)"

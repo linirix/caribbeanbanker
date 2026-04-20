@@ -1,0 +1,403 @@
+{
+  "difficulties": {
+    "apprentice": {
+      "displayName": "Apprentice",
+      "tagline": "Forgiving. Expectations anchor easily; political shocks pass quickly.",
+      "expectationsBaseAdaptSpeed": 0.13,
+      "expectationsCredibilityAmplifier": 0.22,
+      "credibilitySurpriseDecrement": 0.018,
+      "credibilityCalmIncrement": 0.012,
+      "credibilitySustainedLowBonus": 0.028,
+      "credibilityCapitalControlsDrag": 0.01,
+      "inflationPhillipsSlope": 0.16,
+      "politicalInflationCoef": 90.0,
+      "politicalUnemploymentCoef": 140.0,
+      "politicalRecessionBump": 12.0,
+      "approvalInflationCoef": -200.0,
+      "approvalCapitalControlsCoef": -18.0
+    },
+    "governor": {
+      "displayName": "Governor",
+      "tagline": "The default model. Historically plausible rigidity and fragility.",
+      "expectationsBaseAdaptSpeed": 0.21,
+      "expectationsCredibilityAmplifier": 0.45,
+      "credibilitySurpriseDecrement": 0.025,
+      "credibilityCalmIncrement": 0.007,
+      "credibilitySustainedLowBonus": 0.012,
+      "credibilityCapitalControlsDrag": 0.022,
+      "inflationPhillipsSlope": 0.26,
+      "politicalInflationCoef": 170.0,
+      "politicalUnemploymentCoef": 220.0,
+      "politicalRecessionBump": 24.0,
+      "approvalInflationCoef": -360.0,
+      "approvalUnemploymentCoef": -520.0,
+      "approvalCapitalControlsCoef": -25.0
+    },
+    "volcker": {
+      "displayName": "Volcker",
+      "tagline": "Punishing. Expectations de-anchor fast; credibility is precious.",
+      "expectationsBaseAdaptSpeed": 0.25,
+      "expectationsCredibilityAmplifier": 0.58,
+      "credibilitySurpriseDecrement": 0.04,
+      "credibilityCalmIncrement": 0.005,
+      "credibilityHighInflationDecrement": 0.018,
+      "credibilitySustainedLowBonus": 0.01,
+      "credibilityCapitalControlsDrag": 0.028,
+      "inflationPhillipsSlope": 0.29,
+      "exchangeRateCurrentAccountPressure": -0.25,
+      "capitalAccountExpectationsSensitivity": -0.62,
+      "politicalInflationCoef": 190.0,
+      "politicalUnemploymentCoef": 250.0,
+      "politicalRecessionBump": 28.0,
+      "politicalSmoothingRetain": 0.84,
+      "approvalInflationCoef": -390.0,
+      "approvalUnemploymentCoef": -560.0,
+      "approvalCapitalControlsCoef": -34.0
+    }
+  },
+  "gameLengths": {
+    "extended": {
+      "exchangeRateUIPMultiplier": 1.1,
+      "exchangeRateCurrentAccountPressureMultiplier": 0.78,
+      "capitalAccountInterestSensitivityMultiplier": 1.1,
+      "capitalAccountExpectationsSensitivityMultiplier": 0.75,
+      "currentAccountAbsorptionMultiplier": 0.85,
+      "currentAccountPartnerSensitivityMultiplier": 1.1,
+      "reservesCriticalMonths": 0.7,
+      "reservesWarningMonths": 2.2,
+      "outcomesCurrencyCrisisReserves": 0.5
+    }
+  },
+  "opening": {
+    "historicalGrowth": {
+      "short": 0.042,
+      "extended": 0.048
+    },
+    "randomizedGrowthOffsetMin": -0.01,
+    "randomizedGrowthOffsetMax": 0.02,
+    "randomizedGrowthMin": 0.015,
+    "randomizedGrowthMax": 0.06,
+    "baselines": {
+      "short": {
+        "inflation": 0.055,
+        "coreInflation": 0.05,
+        "expectedInflation": 0.05,
+        "unemployment": 0.065,
+        "nairu": 0.07,
+        "policyRate": 0.06,
+        "reserveRequirement": 0.12,
+        "m2Growth": 0.08,
+        "bankCreditGrowth": 0.1,
+        "credibility": 0.7,
+        "exchangeRate": 2.0,
+        "exchangeRateQoQChange": 0.0,
+        "currentAccountGDP": -0.025,
+        "capitalAccountGDP": 0.008,
+        "foreignReservesMonths": 4.2,
+        "capitalControls": 0.3,
+        "externalDebtGDP": 0.3,
+        "fiscalBalanceGDP": -0.04,
+        "governmentDebtGDP": 0.5,
+        "politicalPressure": 24.0,
+        "publicApproval": 52.0,
+        "worldInterestRate": 0.06,
+        "worldInflation": 0.055,
+        "tradingPartnerGrowth": 0.035,
+        "oilPriceIndex": 100.0,
+        "commodityPriceIndex": 100.0,
+        "termsOfTrade": 1.0
+      },
+      "extended": {
+        "inflation": 0.032,
+        "coreInflation": 0.03,
+        "expectedInflation": 0.03,
+        "unemployment": 0.055,
+        "nairu": 0.062,
+        "policyRate": 0.055,
+        "reserveRequirement": 0.11,
+        "m2Growth": 0.07,
+        "bankCreditGrowth": 0.085,
+        "credibility": 0.78,
+        "exchangeRate": 1.65,
+        "exchangeRateQoQChange": 0.0,
+        "currentAccountGDP": -0.004,
+        "capitalAccountGDP": 0.012,
+        "foreignReservesMonths": 6.8,
+        "capitalControls": 0.25,
+        "externalDebtGDP": 0.18,
+        "fiscalBalanceGDP": -0.025,
+        "governmentDebtGDP": 0.32,
+        "politicalPressure": 18.0,
+        "publicApproval": 58.0,
+        "worldInterestRate": 0.045,
+        "worldInflation": 0.025,
+        "tradingPartnerGrowth": 0.042,
+        "oilPriceIndex": 100.0,
+        "commodityPriceIndex": 100.0,
+        "termsOfTrade": 1.02
+      }
+    }
+  },
+  "scoring": {
+    "baseline": 100,
+    "extendedBonusScale": 1.5,
+    "tracking": {
+      "highInflationThreshold": 0.08,
+      "severeInflationThreshold": 0.15,
+      "recessionGrowthThreshold": -0.005,
+      "highUnemploymentThreshold": 0.085,
+      "lowCredibilityThreshold": 0.5,
+      "nearOusterThreshold": 70.0
+    },
+    "outcomePenalties": {
+      "currencyCrisis": 60,
+      "hyperinflation": 70,
+      "depression": 55,
+      "politicalOuster": 50
+    },
+    "perQuarterPenalties": {
+      "highInflation": 3,
+      "severeInflation": 4,
+      "stagflation": 3,
+      "recession": 2,
+      "highUnemployment": 2,
+      "lowCredibility": 1,
+      "nearOuster": 2
+    },
+    "extremes": {
+      "peakInflationThreshold": 0.25,
+      "lowestReservesThreshold": 2.5,
+      "lowestCredibilityThreshold": 0.35,
+      "peakPoliticalPressureThreshold": 80.0,
+      "peakInflationPenalty": 8,
+      "lowestReservesPenalty": 8,
+      "lowestCredibilityPenalty": 8,
+      "peakPoliticalPressurePenalty": 6
+    },
+    "successBonuses": {
+      "peakInflationThreshold": 0.07,
+      "lowestCredibilityThreshold": 0.75,
+      "lowestReservesThreshold": 3.0,
+      "inflationContainedBonus": 10,
+      "credibilityBonus": 8,
+      "laborMarketBonus": 6,
+      "externalPositionBonus": 6
+    },
+    "headlineBands": [
+      { "minScore": 90, "label": "VOLCKER-CLASS OPERATOR" },
+      { "minScore": 75, "label": "Competent Technocrat" },
+      { "minScore": 60, "label": "Steady Hand, Choppy Decade" },
+      { "minScore": 45, "label": "Muddled Through" },
+      { "minScore": 30, "label": "Credibility in Tatters" },
+      { "minScore": 15, "label": "Accidental Arsonist" },
+      { "minScore": 0, "label": "Mandate in Ruins" }
+    ]
+  },
+  "cabinet": {
+    "delayEffects": {
+      "politicalPressureDelta": 3.0
+    },
+    "requests": {
+      "cutRates": {
+        "detail": "Cabinet argues unemployment is politically intolerable and demands rate relief.",
+        "trigger": {
+          "anyOf": [
+            { "minUnemployment": 0.09 },
+            { "maxOutputGap": -0.03 },
+            { "minPoliticalPressure": 55.0 }
+          ]
+        },
+        "acceptEffects": {
+          "policyRateDelta": -0.01,
+          "politicalPressureDelta": -8.0,
+          "publicApprovalDelta": 3.0,
+          "credibilityDelta": -0.01
+        },
+        "rejectEffects": {
+          "politicalPressureDelta": 8.0,
+          "publicApprovalDelta": -2.0,
+          "credibilityDelta": 0.008
+        }
+      },
+      "tightenControls": {
+        "detail": "Ministers want tighter capital controls to slow reserve losses and show crisis management.",
+        "trigger": {
+          "maxForeignReservesMonths": 3.0,
+          "maxCapitalControls": 0.69
+        },
+        "acceptEffects": {
+          "capitalControlsDelta": 0.1,
+          "capitalAccountGDPDelta": 0.008,
+          "politicalPressureDelta": -4.0,
+          "publicApprovalDelta": -2.0,
+          "credibilityDelta": -0.01
+        },
+        "rejectEffects": {
+          "politicalPressureDelta": 5.0,
+          "credibilityDelta": 0.005
+        }
+      },
+      "defendCurrency": {
+        "detail": "The Prime Minister wants visible action to arrest SLD weakness before confidence collapses.",
+        "trigger": {
+          "minForeignReservesMonths": 0.8,
+          "anyOf": [
+            { "minExchangeRateQoQChange": 0.035 },
+            { "maxForeignReservesMonths": 2.2 }
+          ]
+        },
+        "acceptEffects": {
+          "fxInterventionMonths": -0.5,
+          "politicalPressureDelta": -5.0,
+          "publicApprovalDelta": 1.0,
+          "credibilityDelta": 0.005
+        },
+        "rejectEffects": {
+          "politicalPressureDelta": 6.0,
+          "publicApprovalDelta": -3.0,
+          "credibilityDelta": -0.005
+        }
+      }
+    }
+  },
+  "crisis": {
+    "cooldownQuarters": 4,
+    "measures": {
+      "imfProgram": {
+        "detail": "Request an IMF package to stabilize reserves and reopen external financing.",
+        "tradeoff": "Adds reserves and credibility, but hurts growth, approval, and raises external debt.",
+        "availability": {
+          "anyOf": [
+            { "maxForeignReservesMonths": 1.15 },
+            { "minExternalDebtGDP": 0.74 },
+            { "minExchangeRateQoQChange": 0.065 }
+          ]
+        },
+        "effects": {
+          "foreignReservesMonthsDelta": 1.1,
+          "capitalAccountGDPDelta": 0.007,
+          "credibilityDelta": 0.007,
+          "expectedInflationDelta": -0.002,
+          "outputGapDelta": -0.014,
+          "publicApprovalDelta": -7.5,
+          "politicalPressureDelta": 5.5,
+          "externalDebtGDPDelta": 0.032,
+          "interventionSupportCarryDelta": 0.009
+        },
+        "newsLine": "CRISIS MEASURE: IMF program agreed. Reserves replenished, but austerity politics turn ugly.",
+        "resultMessage": "IMF program enacted. Reserves rise, expectations cool, but growth and approval take a hit."
+      },
+      "bankHoliday": {
+        "detail": "Shut banks briefly and tighten emergency controls to stop a run on the system.",
+        "tradeoff": "Buys FX relief fast, but damages approval, credibility, and alarms the public.",
+        "availability": {
+          "anyOf": [
+            { "maxForeignReservesMonths": 1.4 },
+            { "maxCapitalAccountGDP": -0.01 },
+            { "minExchangeRateQoQChange": 0.035 }
+          ]
+        },
+        "effects": {
+          "capitalControlsDelta": 0.3,
+          "capitalAccountGDPDelta": 0.028,
+          "foreignReservesMonthsDelta": 0.6,
+          "publicApprovalDelta": -6.0,
+          "politicalPressureDelta": 2.0,
+          "credibilityDelta": -0.012,
+          "expectedInflationDelta": 0.001,
+          "interventionSupportCarryDelta": 0.016,
+          "controlsReliefCarryDelta": 0.022
+        },
+        "newsLine": "CRISIS MEASURE: Bank holiday declared. Authorities halt the run and tighten controls.",
+        "resultMessage": "Bank holiday enacted. External pressure eases, but confidence and approval suffer."
+      },
+      "emergencyLiquidity": {
+        "detail": "Backstop banks and credit markets before recession turns into a collapse.",
+        "tradeoff": "Supports demand and politics now, but lifts inflation risk and dents credibility.",
+        "availability": {
+          "anyOf": [
+            { "minUnemployment": 0.09 },
+            { "maxOutputGap": -0.025 },
+            { "maxAnnualizedGDPGrowth": -0.005 }
+          ]
+        },
+        "effects": {
+          "outputGapDelta": 0.025,
+          "publicApprovalDelta": 4.0,
+          "politicalPressureDelta": -5.0,
+          "inflationDelta": 0.004,
+          "expectedInflationDelta": 0.001,
+          "credibilityDelta": -0.006,
+          "foreignReservesMonthsDelta": -0.03
+        },
+        "newsLine": "CRISIS MEASURE: Emergency liquidity window opened. Credit panic slows, but inflation risk rises.",
+        "resultMessage": "Emergency liquidity opened. Recession pressure eases now, but inflation and credibility worsen."
+      }
+    }
+  },
+  "randomEvents": {
+    "cycleLength": 36,
+    "commonPool": [
+      { "event": { "kind": "tourismBoom" }, "probability": 0.06 },
+      { "event": { "kind": "tourismCollapse" }, "probability": 0.08 },
+      { "event": { "kind": "commodityBoom", "value": 0.15 }, "probability": 0.05 },
+      { "event": { "kind": "commoditySlump", "value": 0.12 }, "probability": 0.08 },
+      { "event": { "kind": "droughtOrDisaster" }, "probability": 0.07 },
+      {
+        "event": { "kind": "workerStrike" },
+        "probability": 0.10,
+        "condition": { "anyOf": [ { "minUnemployment": 0.08 }, { "minInflation": 0.10 } ] }
+      },
+      {
+        "event": { "kind": "politicalDemand" },
+        "probability": 0.14,
+        "condition": { "anyOf": [ { "minPoliticalPressure": 35.0 }, { "minUnemployment": 0.085 }, { "minInflation": 0.08 } ] }
+      },
+      {
+        "event": { "kind": "speculativeAttack" },
+        "probability": 0.10,
+        "condition": { "maxForeignReservesMonths": 4.0, "maxCapitalControls": 0.69 }
+      },
+      {
+        "event": { "kind": "capitalFlight" },
+        "probability": 0.10,
+        "condition": { "anyOf": [ { "minInflation": 0.10 }, { "maxForeignReservesMonths": 3.4 } ] }
+      },
+      {
+        "event": { "kind": "creditCrunch" },
+        "probability": 0.04,
+        "condition": { "minPolicyRate": 0.14 }
+      },
+      {
+        "event": { "kind": "foreignAid" },
+        "probability": 0.03,
+        "condition": { "maxForeignReservesMonths": 2.5 }
+      }
+    ],
+    "macroPool": [
+      { "event": { "kind": "oilShock", "minValue": 1.0, "maxValue": 2.8 }, "totalProbability": 0.90, "earliestQuarterIndex": 2, "latestQuarterIndex": 28 },
+      { "event": { "kind": "oilShock", "minValue": 0.6, "maxValue": 1.4 }, "totalProbability": 0.80, "earliestQuarterIndex": 10, "latestQuarterIndex": 34 },
+      { "event": { "kind": "oilRecovery", "minValue": 0.10, "maxValue": 0.25 }, "totalProbability": 0.55, "earliestQuarterIndex": 8, "latestQuarterIndex": 34 },
+      { "event": { "kind": "tradingPartnerRecession", "value": 0.025 }, "totalProbability": 0.85, "earliestQuarterIndex": 2, "latestQuarterIndex": 28 },
+      { "event": { "kind": "tradingPartnerRecession", "value": 0.020 }, "totalProbability": 0.65, "earliestQuarterIndex": 16, "latestQuarterIndex": 34 },
+      { "event": { "kind": "tradingPartnerRecovery" }, "totalProbability": 0.65, "earliestQuarterIndex": 6, "latestQuarterIndex": 30 },
+      { "event": { "kind": "debtRefinancing" }, "totalProbability": 0.80, "earliestQuarterIndex": 4, "latestQuarterIndex": 24 },
+      { "event": { "kind": "debtRefinancing" }, "totalProbability": 0.70, "earliestQuarterIndex": 18, "latestQuarterIndex": 34 },
+      { "event": { "kind": "imfReview" }, "totalProbability": 0.90, "earliestQuarterIndex": 4, "latestQuarterIndex": 20 },
+      { "event": { "kind": "imfReview" }, "totalProbability": 0.90, "earliestQuarterIndex": 22, "latestQuarterIndex": 34 },
+      { "event": { "kind": "commodityBoom", "value": 0.25 }, "totalProbability": 0.40, "earliestQuarterIndex": 0, "latestQuarterIndex": 28 },
+      { "event": { "kind": "commoditySlump", "value": 0.30 }, "totalProbability": 0.65, "earliestQuarterIndex": 4, "latestQuarterIndex": 34 }
+    ]
+  },
+  "randomizedWorldRates": {
+    "baseRate": 0.06,
+    "floorRate": 0.04,
+    "ceilingRate": 0.18,
+    "jumpProbability": 0.10,
+    "jumpMin": -0.012,
+    "jumpMax": 0.04,
+    "driftMin": -0.004,
+    "driftMax": 0.01,
+    "trendMax": 0.055
+  }
+}
