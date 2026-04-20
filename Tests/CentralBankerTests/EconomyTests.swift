@@ -301,6 +301,38 @@ final class EconomyTests: XCTestCase {
                           "Validation scoring should punish unfinished horizons that are still visibly unstable.")
     }
 
+    func testValidationScorePenalizesStillOverheatingMoreThanCooledStabilization() {
+        let hot = EconomicSimulator(seed: testSeed)
+        hot.state.inflation = 0.145
+        hot.state.outputGap = 0.030
+        hot.state.foreignReservesMonths = 2.4
+        hot.state.credibility = 0.45
+        hot.scoreCard.highInflationQuarters = 4
+
+        let cooled = EconomicSimulator(seed: testSeed)
+        cooled.state.inflation = 0.112
+        cooled.state.outputGap = -0.030
+        cooled.state.foreignReservesMonths = 2.4
+        cooled.state.credibility = 0.45
+        cooled.scoreCard.highInflationQuarters = 4
+
+        let hotScore = computeValidationScore(
+            outcome: .ongoing,
+            simulator: hot,
+            gameLength: .short,
+            horizonQuarters: 8
+        )
+        let cooledScore = computeValidationScore(
+            outcome: .ongoing,
+            simulator: cooled,
+            gameLength: .short,
+            horizonQuarters: 8
+        )
+
+        XCTAssertLessThan(hotScore, cooledScore,
+                          "The validator should score a still-overheating economy below one that has already cooled demand, even if inflation is still elevated in both.")
+    }
+
     func testScenarioCompletionAndGoalEvaluation() {
         var state = EconomicState()
         state.year = 1976
@@ -869,6 +901,42 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(turn.activeQuarter)
         XCTAssertTrue(sim.state.capitalControls > priorControls || turn.interventionMonthsAbs > 0.0,
                       "FullReactive bot should not wait for reserves to collapse before defending the external side in an overheating/falling-currency profile.")
+    }
+
+    func testFullReactiveBotCapsEarlyControlsInOverheatingProfile() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.inflation = 0.140
+        sim.state.expectedInflation = 0.112
+        sim.state.outputGap = 0.042
+        sim.state.policyRate = 0.060
+        sim.state.foreignReservesMonths = 3.1
+        sim.state.exchangeRateQoQChange = 0.030
+        sim.state.currentAccountGDP = -0.035
+        sim.state.capitalAccountGDP = -0.008
+        sim.state.capitalControls = 0.42
+        sim.state.bankCreditGrowth = 0.170
+
+        _ = applyBalanceBotTurn(.fullReactive, to: sim)
+
+        XCTAssertLessThanOrEqual(sim.state.capitalControls, 0.45 + 1e-12,
+                                 "Overheating-era external defense should not jump immediately to near-lockdown controls while reserves are still comfortable.")
+    }
+
+    func testFullReactiveBotRelaxesFromHawkishToBalancedOnceBoomHasClearlyCooled() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.communicationStance = .hawkish
+        sim.state.inflation = 0.108
+        sim.state.expectedInflation = 0.094
+        sim.state.outputGap = -0.028
+        sim.state.exchangeRateQoQChange = 0.018
+        sim.state.policyRate = 0.120
+        sim.state.foreignReservesMonths = 2.9
+
+        let turn = applyBalanceBotTurn(.fullReactive, to: sim)
+
+        XCTAssertTrue(turn.activeQuarter)
+        XCTAssertEqual(sim.communicationStance, .balanced,
+                       "Once the boom has clearly cooled, FullReactive should stop using hawkish communication as a default.")
     }
 
     // MARK: - 4. Oil shock raises inflation

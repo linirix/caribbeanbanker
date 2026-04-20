@@ -400,7 +400,9 @@ class EconomicSimulator {
             return
 
         case .hawkish:
-            s.politicalPressure = params.political.bounds.clamping(s.politicalPressure + 2.0)
+            let hawkishPressureBump =
+                (s.inflation > 0.10 || s.outputGap > 0.02) ? 0.5 : 2.0
+            s.politicalPressure = params.political.bounds.clamping(s.politicalPressure + hawkishPressureBump)
             if isHawkishCommunicationConsistent(state: s) {
                 s.credibility = params.credibility.bounds.clamping(s.credibility + 0.010)
                 s.expectedInflation = params.expectations.bounds.clamping(s.expectedInflation - 0.003)
