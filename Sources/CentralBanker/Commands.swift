@@ -101,13 +101,13 @@ func parseCommand(_ input: String) -> Command {
             return .invalid("comm requires hawkish, balanced, dovish, or opaque")
         }
         switch parts[1] {
-        case "hawkish", "h":
+        case "hawkish", "hawk", "h":
             return .setCommunication(.hawkish)
-        case "balanced", "b":
+        case "balanced", "balance", "bal", "b":
             return .setCommunication(.balanced)
-        case "dovish", "d":
+        case "dovish", "dove", "dov", "d":
             return .setCommunication(.dovish)
-        case "opaque", "o":
+        case "opaque", "opaq", "op", "o":
             return .setCommunication(.opaque)
         default:
             return .invalid("comm must be hawkish, balanced, dovish, or opaque")
@@ -286,13 +286,45 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
         return String(format: "Capital controls %@ to level %d (%@).", direction, idx, labels[idx])
 
     case .intervene(let months):
+        let oldRate = simulator.state.exchangeRate
+        let oldReserves = simulator.state.foreignReservesMonths
+        let oldSupportCarry = simulator.interventionSupportCarry
         simulator.applyFXIntervention(months: months)
-        if months > 0 {
-            return String(format: "Intervened to buy %.2f months of reserves (sold SLD). Rate: %.3f SLD/USD.",
-                months, simulator.state.exchangeRate)
+        let newRate = simulator.state.exchangeRate
+        let newReserves = simulator.state.foreignReservesMonths
+        let fxDirection: String
+        if newRate < oldRate - 0.0005 {
+            fxDirection = "SLD strengthened"
+        } else if newRate > oldRate + 0.0005 {
+            fxDirection = "SLD weakened"
         } else {
-            return String(format: "Intervened to defend SLD — sold %.2f months of reserves. Rate: %.3f SLD/USD.",
-                -months, simulator.state.exchangeRate)
+            fxDirection = "SLD was little changed"
+        }
+
+        if months > 0 {
+            return String(
+                format: "Bought %.2f months of FX reserves and sold SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f SLD/USD (%@).",
+                months,
+                oldReserves,
+                newReserves,
+                oldRate,
+                newRate,
+                fxDirection
+            )
+        } else {
+            let supportText = simulator.interventionSupportCarry > oldSupportCarry
+                ? " Temporary defense support has been added for the next quarter."
+                : ""
+            return String(
+                format: "Sold %.2f months of FX reserves and bought SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f SLD/USD (%@).%@",
+                -months,
+                oldReserves,
+                newReserves,
+                oldRate,
+                newRate,
+                fxDirection,
+                supportText
+            )
         }
 
     case .setCommunication(let stance):

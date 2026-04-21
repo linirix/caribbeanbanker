@@ -249,7 +249,12 @@ private func renderMetric(_ metric: MetricDescriptor) -> String {
     case .bar(let maxValue):
         let fillColor = severityColor(metric.severity)
         let chart = bar(metric.numericValue ?? 0.0, maxVal: maxValue, color: fillColor)
-        return "  " + pad(metric.label + ":", to: 16) + chart + " " + color + metric.primaryValue + A.reset
+        var value = chart + " " + color + metric.primaryValue + A.reset
+        let trend = trendGlyph(metric.trend)
+        if !trend.isEmpty {
+            value += " " + trend
+        }
+        return "  " + pad(metric.label + ":", to: 16) + value
     }
 }
 

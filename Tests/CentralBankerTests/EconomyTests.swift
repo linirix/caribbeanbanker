@@ -457,6 +457,54 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(snapshot.advisorySections.flatMap(\.rows).contains(where: { $0.contains("Cabinet pending") }))
     }
 
+    func testDashboardSnapshotShowsReserveTrendDirection() throws {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        let sim = session.simulator
+        sim.state.foreignReservesMonths = 3.4
+        sim.log.quarterSnapshots = [
+            QuarterSnapshot(
+                quarterLabel: "Q1 1973",
+                inflation: 0.05,
+                annualizedGDPGrowth: 0.03,
+                unemployment: 0.07,
+                foreignReservesMonths: 4.1,
+                policyRate: 0.06,
+                capitalControls: 0.30,
+                exchangeRate: 2.0,
+                credibility: 0.70,
+                publicApproval: 52.0,
+                politicalPressure: 24.0
+            ),
+            QuarterSnapshot(
+                quarterLabel: "Q2 1973",
+                inflation: 0.055,
+                annualizedGDPGrowth: 0.025,
+                unemployment: 0.072,
+                foreignReservesMonths: 3.7,
+                policyRate: 0.06,
+                capitalControls: 0.30,
+                exchangeRate: 2.03,
+                credibility: 0.68,
+                publicApproval: 51.0,
+                politicalPressure: 26.0
+            )
+        ]
+
+        let snapshot = session.makeDashboardSnapshot()
+        let reserveMetric = try XCTUnwrap(
+            snapshot.metricSections
+                .flatMap(\.rows)
+                .compactMap(\.right)
+                .first(where: { $0.id == "fx-reserves" })
+        )
+
+        XCTAssertEqual(reserveMetric.trend, .down)
+    }
+
     func testRenderedDashboardShowsAvailableCrisisMeasureNames() {
         let sim = EconomicSimulator(seed: testSeed)
         sim.state.foreignReservesMonths = 0.7
@@ -475,6 +523,42 @@ final class EconomyTests: XCTestCase {
 
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains(expectedHint))
+    }
+
+    func testRenderedDashboardShowsReserveTrendArrow() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.log.quarterSnapshots = [
+            QuarterSnapshot(
+                quarterLabel: "Q1 1973",
+                inflation: 0.05,
+                annualizedGDPGrowth: 0.03,
+                unemployment: 0.07,
+                foreignReservesMonths: 4.0,
+                policyRate: 0.06,
+                capitalControls: 0.30,
+                exchangeRate: 2.0,
+                credibility: 0.70,
+                publicApproval: 52.0,
+                politicalPressure: 24.0
+            ),
+            QuarterSnapshot(
+                quarterLabel: "Q2 1973",
+                inflation: 0.055,
+                annualizedGDPGrowth: 0.025,
+                unemployment: 0.072,
+                foreignReservesMonths: 3.5,
+                policyRate: 0.06,
+                capitalControls: 0.30,
+                exchangeRate: 2.03,
+                credibility: 0.68,
+                publicApproval: 51.0,
+                politicalPressure: 26.0
+            )
+        ]
+
+        let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
+        assertRenderedScreenFits(rendered)
+        XCTAssertTrue(rendered.contains("FX Reserves:"))
     }
 
     func testRenderedHelpFitsFrameAndRetainsSections() {
@@ -1123,6 +1207,24 @@ final class EconomyTests: XCTestCase {
             XCTFail("comm command should parse into .setCommunication")
         }
 
+        if case .setCommunication(let stance) = parseCommand("comm hawk") {
+            XCTAssertEqual(stance, .hawkish)
+        } else {
+            XCTFail("comm hawk alias should parse into .setCommunication(.hawkish)")
+        }
+
+        if case .setCommunication(let stance) = parseCommand("comm bal") {
+            XCTAssertEqual(stance, .balanced)
+        } else {
+            XCTFail("comm bal alias should parse into .setCommunication(.balanced)")
+        }
+
+        if case .setCommunication(let stance) = parseCommand("comm dove") {
+            XCTAssertEqual(stance, .dovish)
+        } else {
+            XCTFail("comm dove alias should parse into .setCommunication(.dovish)")
+        }
+
         if case .preview(let changes) = parseCommand("preview rate 12.5 reserve 14 controls 6") {
             XCTAssertEqual(changes, [.rate(0.125), .reserve(0.14), .controls(0.6)])
         } else {
@@ -1324,6 +1426,30 @@ final class EconomyTests: XCTestCase {
 
         XCTAssertLessThan(sim.interventionSupportCarry, interventionCarry)
         XCTAssertLessThan(sim.controlsReliefCarry, controlsCarry)
+    }
+
+    func testFXInterventionDirectionAndMessageMatchExchangeRateConvention() {
+        let defending = EconomicSimulator(seed: testSeed)
+        let defendInitialRate = defending.state.exchangeRate
+        let defendInitialReserves = defending.state.foreignReservesMonths
+        let defendMessage = applyCommand(.intervene(-0.5), simulator: defending)
+
+        XCTAssertLessThan(defending.state.exchangeRate, defendInitialRate,
+                          "Buying SLD with reserves should lower SLD/USD and strengthen the currency immediately.")
+        XCTAssertLessThan(defending.state.foreignReservesMonths, defendInitialReserves)
+        XCTAssertEqual(defendMessage?.localizedCaseInsensitiveContains("bought SLD"), true)
+        XCTAssertEqual(defendMessage?.contains("SLD strengthened"), true)
+
+        let accumulating = EconomicSimulator(seed: testSeed)
+        let accumulateInitialRate = accumulating.state.exchangeRate
+        let accumulateInitialReserves = accumulating.state.foreignReservesMonths
+        let accumulateMessage = applyCommand(.intervene(0.5), simulator: accumulating)
+
+        XCTAssertGreaterThan(accumulating.state.exchangeRate, accumulateInitialRate,
+                             "Accumulating reserves by selling SLD should raise SLD/USD and weaken the currency immediately.")
+        XCTAssertGreaterThan(accumulating.state.foreignReservesMonths, accumulateInitialReserves)
+        XCTAssertEqual(accumulateMessage?.contains("sold SLD"), true)
+        XCTAssertEqual(accumulateMessage?.contains("SLD weakened"), true)
     }
 
     func testAdvanceWithoutResponseTreatsCabinetRequestAsDelay() {
