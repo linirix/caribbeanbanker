@@ -186,6 +186,33 @@ private func wrappedRows(_ text: String, indent: String = "  ", width: Int = IW 
 
 func displayVisualWidth(_ s: String) -> Int { vlen(s) }
 
+func statusMessageRows(_ text: String, width: Int = displayFrameWidth) -> [String] {
+    let prefix = "  " + A.bYellow + "→ " + A.reset
+    let continuation = "    "
+    let usableWidth = max(12, width)
+    let words = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+
+    guard !words.isEmpty else { return [prefix] }
+
+    var rows: [String] = []
+    var current = prefix
+
+    for word in words {
+        let candidate = current == prefix || current == continuation
+            ? current + word
+            : current + " " + word
+        if vlen(candidate) <= usableWidth {
+            current = candidate
+        } else {
+            rows.append(current)
+            current = continuation + word
+        }
+    }
+
+    rows.append(current)
+    return rows
+}
+
 private func renderScreen(_ lines: [String],
                           prompt: String? = nil,
                           clearScreen: Bool = true) -> String {
@@ -595,15 +622,15 @@ func renderGameOver(_ snapshot: GameOverSnapshot) -> String {
         appendScenarioAssessment(&lines, assessment: assessment)
     }
 
+    if let failureDiagnosisSection = snapshot.failureDiagnosisSection {
+        lines.append(hline(ML, HH, MR))
+        appendInfoSection(&lines, section: failureDiagnosisSection)
+    }
+
     lines.append(hline(ML, HH, MR))
     lines.append(sectionHeadingRow(snapshot.reviewSection.heading))
     for row in snapshot.reviewSection.rows {
         appendWrappedText(&lines, row)
-    }
-
-    if let failureDiagnosisSection = snapshot.failureDiagnosisSection {
-        lines.append(hline(ML, HH, MR))
-        appendInfoSection(&lines, section: failureDiagnosisSection)
     }
 
     lines.append(hline(ML, HH, MR))

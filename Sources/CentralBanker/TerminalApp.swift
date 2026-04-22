@@ -326,7 +326,9 @@ package func runTerminalApp() {
     while gameRunning {
         if let msg = lastMessage {
             print()
-            print("  " + A.bYellow + "→ " + A.reset + msg)
+            for row in statusMessageRows(msg) {
+                print(row)
+            }
             lastMessage = nil
         }
 

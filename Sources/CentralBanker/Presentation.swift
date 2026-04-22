@@ -308,7 +308,8 @@ extension GameSession {
             estimate: preview.estimate,
             context: makePresentationSnapshot(),
             headerNote: preview.note,
-            baselineEstimate: pendingPreviewReview?.baselineEstimate
+            baselineEstimate: pendingPreviewReview?.baselineEstimate,
+            params: simulator.params
         )
     }
 
@@ -414,7 +415,8 @@ func makePreviewSnapshot(estimate: ForecastEstimate,
         estimate: estimate,
         context: makePresentationContext(simulator: nil, gameLength: gameLength, scenarioID: scenarioID, quarterLabel: estimate.estimatedAfter.quarterLabel),
         headerNote: headerNote,
-        baselineEstimate: baselineEstimate
+        baselineEstimate: baselineEstimate,
+        params: .default
     )
 }
 
@@ -1083,7 +1085,8 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
 private func buildPreviewSnapshot(estimate: ForecastEstimate,
                                   context: GamePresentationSnapshot,
                                   headerNote: String?,
-                                  baselineEstimate: ForecastEstimate? = nil) -> PreviewSnapshot {
+                                  baselineEstimate: ForecastEstimate? = nil,
+                                  params: ModelParameters = .default) -> PreviewSnapshot {
     let report = estimate.report
     let before = report.stateBefore
     let after = estimate.estimatedAfter
@@ -1109,6 +1112,7 @@ private func buildPreviewSnapshot(estimate: ForecastEstimate,
             comparisonDescriptor(id: "approval", label: "Public approval", before: before.publicApproval, after: after.publicApproval, style: .score)
         ],
         analysisSections: previewAnalysisSections(
+            params: params,
             before: before,
             after: after,
             report: report,
@@ -1693,7 +1697,8 @@ private func buildGameOverSnapshot(outcome: GameOutcome,
     )
 }
 
-private func previewAnalysisSections(before: EconomicState,
+private func previewAnalysisSections(params: ModelParameters,
+                                     before: EconomicState,
                                      after: EconomicState,
                                      report: QuarterReport,
                                      headerNote: String?,
@@ -1703,24 +1708,34 @@ private func previewAnalysisSections(before: EconomicState,
         InfoSection(
             heading: "Policy effect",
             rows: previewPolicyRows(
+                params: params,
                 before: before,
                 after: after,
                 headerNote: headerNote,
-                baselineEstimate: baselineEstimate
+                baselineEstimate: baselineEstimate,
+                report: report
             )
         ),
         InfoSection(
             heading: "Shock effect",
-            rows: previewShockRows(eventHeadlines: eventHeadlines),
+            rows: previewShockRows(
+                params: params,
+                before: before,
+                after: after,
+                report: report,
+                eventHeadlines: eventHeadlines
+            ),
             bullets: eventHeadlines
         ),
         InfoSection(
-            heading: "Expectation and communication",
+            heading: "Expectation lag",
             rows: expectationAndCommunicationRows(
                 before: before,
                 after: after,
                 news: report.news,
-                previewMode: true
+                previewMode: true,
+                report: report,
+                params: params
             )
         )
     ]
@@ -1734,20 +1749,33 @@ private func debriefAnalysisSections(simulator: EconomicSimulator,
     var sections: [InfoSection] = [
         InfoSection(
             heading: "Policy effect",
-            rows: debriefPolicyRows(simulator: simulator, before: report.stateBefore)
+            rows: debriefPolicyRows(
+                simulator: simulator,
+                before: report.stateBefore,
+                after: report.stateAfter,
+                report: report
+            )
         ),
         InfoSection(
             heading: "Shock effect",
-            rows: debriefShockRows(eventHeadlines: eventHeadlines),
+            rows: debriefShockRows(
+                simulator: simulator,
+                before: report.stateBefore,
+                after: report.stateAfter,
+                report: report,
+                eventHeadlines: eventHeadlines
+            ),
             bullets: eventHeadlines
         ),
         InfoSection(
-            heading: "Expectation and communication",
+            heading: "Expectation lag",
             rows: expectationAndCommunicationRows(
                 before: report.stateBefore,
                 after: report.stateAfter,
                 news: rawQuarterEntries,
-                previewMode: false
+                previewMode: false,
+                report: report,
+                params: simulator.params
             )
         )
     ]
@@ -1767,11 +1795,19 @@ private func debriefAnalysisSections(simulator: EconomicSimulator,
     return sections
 }
 
-private func previewPolicyRows(before: EconomicState,
+private func previewPolicyRows(params: ModelParameters,
+                               before: EconomicState,
                                after: EconomicState,
                                headerNote: String?,
-                               baselineEstimate: ForecastEstimate?) -> [String] {
+                               baselineEstimate: ForecastEstimate?,
+                               report: QuarterReport) -> [String] {
     var rows: [String] = []
+    let outputGapRows = outputGapAttributionRows(
+        params: params,
+        before: before,
+        after: after,
+        report: report
+    )
 
     if let headerNote {
         rows.append("This forecast assumes: \(headerNote.replacingOccurrences(of: "Hypothetical: ", with: "")).")
@@ -1797,6 +1833,8 @@ private func previewPolicyRows(before: EconomicState,
         rows.append("Looser capital controls reduce the long-run drag, but they also expose the currency to a faster market test.")
     }
 
+    rows.append(contentsOf: outputGapRows)
+
     if let baselineEstimate {
         rows.append(counterfactualPreviewRow(planAfter: after, baselineAfter: baselineEstimate.estimatedAfter))
     }
@@ -1804,14 +1842,32 @@ private func previewPolicyRows(before: EconomicState,
     return rows
 }
 
-private func previewShockRows(eventHeadlines: [String]) -> [String] {
-    if eventHeadlines.isEmpty {
-        return ["No named shock is scheduled in this preview. Most movement is endogenous: policy lags, expectations, and balance-of-payments persistence."]
-    }
-    return ["Named shocks are expected this quarter, so compare your lever choice against the same shock path rather than treating the forecast as purely policy-driven."]
+private func previewShockRows(params: ModelParameters,
+                              before: EconomicState,
+                              after: EconomicState,
+                              report: QuarterReport,
+                              eventHeadlines: [String]) -> [String] {
+    var rows = inflationShockRows(
+        params: params,
+        before: before,
+        after: after,
+        report: report,
+        eventHeadlines: eventHeadlines,
+        previewMode: true
+    )
+    rows.append(contentsOf: reserveAttributionRows(
+        params: params,
+        before: before,
+        after: after,
+        report: report
+    ))
+    return rows
 }
 
-private func debriefPolicyRows(simulator: EconomicSimulator, before: EconomicState) -> [String] {
+private func debriefPolicyRows(simulator: EconomicSimulator,
+                               before: EconomicState,
+                               after: EconomicState,
+                               report: QuarterReport) -> [String] {
     let neutralRealRate = simulator.params.outputGap.neutralRealRate
     let realRateGap = before.realInterestRate - neutralRealRate
     var rows: [String] = []
@@ -1832,22 +1888,46 @@ private func debriefPolicyRows(simulator: EconomicSimulator, before: EconomicSta
         rows.append("Capital controls were doing part of the external-defense work, which helped the balance of payments but carried its own drag and credibility cost.")
     }
 
+    rows.append(contentsOf: outputGapAttributionRows(
+        params: simulator.params,
+        before: before,
+        after: after,
+        report: report
+    ))
+
     return rows
 }
 
-private func debriefShockRows(eventHeadlines: [String]) -> [String] {
-    if eventHeadlines.isEmpty {
-        return ["No named shock hit this quarter. Most of the movement came from policy lags, expectations, and the external position you were already carrying."]
-    }
-    return ["These shocks hit on top of your policy stance, so not every move this quarter should be read as a direct consequence of your last decision."]
+private func debriefShockRows(simulator: EconomicSimulator,
+                              before: EconomicState,
+                              after: EconomicState,
+                              report: QuarterReport,
+                              eventHeadlines: [String]) -> [String] {
+    var rows = inflationShockRows(
+        params: simulator.params,
+        before: before,
+        after: after,
+        report: report,
+        eventHeadlines: eventHeadlines,
+        previewMode: false
+    )
+    rows.append(contentsOf: reserveAttributionRows(
+        params: simulator.params,
+        before: before,
+        after: after,
+        report: report
+    ))
+    return rows
 }
 
 private func expectationAndCommunicationRows(before: EconomicState,
                                              after: EconomicState,
                                              news: [String],
-                                             previewMode: Bool) -> [String] {
+                                             previewMode: Bool,
+                                             report: QuarterReport,
+                                             params: ModelParameters) -> [String] {
     var rows = [
-        "Expected inflation \(previewMode ? "is projected to move" : "moved") from \(percentText(before.expectedInflation)) to \(percentText(after.expectedInflation))."
+        "Inflation started the quarter with an inherited expectation anchor of \(percentText(before.expectedInflation)); that anchor is the biggest single reason inflation does not respond instantly to new policy."
     ]
 
     if before.credibility < 0.50 {
@@ -1856,6 +1936,13 @@ private func expectationAndCommunicationRows(before: EconomicState,
         rows.append(String(format: "Credibility began the quarter at %.0f%%, so expectations still carry noticeable inertia.", before.credibility * 100))
     }
 
+    rows.append(expectationUpdateRow(
+        params: params,
+        before: before,
+        after: after,
+        previewMode: previewMode,
+        report: report
+    ))
     rows.append(contentsOf: communicationContributionRows(after: after, news: news, previewMode: previewMode))
     return rows
 }
@@ -1945,39 +2032,194 @@ private func counterfactualActualRow(predictedAfter: EconomicState,
     return "Against the hold-steady counterfactual, the preview said your plan would improve inflation by \(String(format: "%.1f", planGain * 100))pp; the realized improvement came in at \(String(format: "%.1f", actualGain * 100))pp."
 }
 
+private func outputGapAttributionRows(params: ModelParameters,
+                                      before: EconomicState,
+                                      after: EconomicState,
+                                      report: QuarterReport) -> [String] {
+    let reserveOverhang = max(0.0, before.reserveRequirement - params.outputGap.reserveRequirementDragThreshold)
+    let controlsOverhang = max(0.0, before.capitalControls - params.outputGap.capitalControlsDragThreshold)
+    let realRateGap = before.realInterestRate - params.outputGap.neutralRealRate
+    let rateContribution = -(params.outputGap.isCoefficient / 4.0) * realRateGap
+    let reserveContribution = -params.outputGap.reserveRequirementDemandDrag * reserveOverhang
+    let controlsContribution = -params.outputGap.capitalControlsDemandDrag * controlsOverhang
+    let creditContribution = params.outputGap.creditImpulse * (after.bankCreditGrowth - params.outputGap.creditBaseline)
+    let currentAccountContribution = params.outputGap.currentAccountSupport * before.currentAccountGDP
+    let directShockContribution = approximateEventOutputGapContribution(report.events)
+    let residualNoise = after.outputGap
+        - (
+            params.outputGap.persistence * before.outputGap
+            + rateContribution
+            + reserveContribution
+            + controlsContribution
+            + creditContribution
+            + currentAccountContribution
+            + directShockContribution
+        )
+
+    return [
+        "Demand channel: rates contributed \(ppText(rateContribution)); reserve requirements \(ppText(reserveContribution)); capital controls \(ppText(controlsContribution)).",
+        "Offsetting support: bank-credit impulse \(ppText(creditContribution)); current-account carry \(ppText(currentAccountContribution)).",
+        "Residual demand noise and timing effects came in at \(ppText(residualNoise))."
+    ]
+}
+
+private func inflationShockRows(params: ModelParameters,
+                                before: EconomicState,
+                                after: EconomicState,
+                                report: QuarterReport,
+                                eventHeadlines: [String],
+                                previewMode: Bool) -> [String] {
+    let demandContribution = params.inflation.phillipsSlope * after.outputGap
+    let fxContribution = params.inflation.exchangeRatePassthrough * after.exchangeRateQoQChange
+    let shockContribution = approximateEventInflationContribution(report.events)
+    let residualNoise = after.inflation - before.expectedInflation - demandContribution - fxContribution - shockContribution
+
+    var rows: [String] = []
+    if eventHeadlines.isEmpty {
+        rows.append("No named supply shock \(previewMode ? "is expected" : "hit") this quarter; the main non-policy inflation drivers were FX passthrough and residual supply noise.")
+    } else {
+        rows.append("Named shocks \(previewMode ? "are expected to add" : "added") roughly \(ppText(shockContribution)) to inflation and \(ppText(approximateEventOutputGapContribution(report.events))) to demand.")
+    }
+    rows.append("Inflation impulse beyond expectations: Phillips demand \(ppText(demandContribution)); FX passthrough \(ppText(fxContribution)); residual supply noise \(ppText(residualNoise)).")
+    return rows
+}
+
+private func reserveAttributionRows(params: ModelParameters,
+                                    before: EconomicState,
+                                    after: EconomicState,
+                                    report: QuarterReport) -> [String] {
+    let bop = after.currentAccountGDP + after.capitalAccountGDP
+    let monthlyImportShare = params.reserves.importShareOfGDP / 12.0
+    let balanceOfPaymentsFlow = (bop / (monthlyImportShare * 12.0)) * 0.25
+    let observedChange = after.foreignReservesMonths - before.foreignReservesMonths
+    let directShockOrRelief = observedChange - balanceOfPaymentsFlow
+
+    return [
+        "Reserves moved \(String(format: "%+.2f", observedChange)) months overall: underlying balance-of-payments flow \(String(format: "%+.2f", balanceOfPaymentsFlow)); direct shock or relief \(String(format: "%+.2f", directShockOrRelief))."
+    ]
+}
+
+private func expectationUpdateRow(params: ModelParameters,
+                                  before: EconomicState,
+                                  after: EconomicState,
+                                  previewMode: Bool,
+                                  report: QuarterReport) -> String {
+    let adaptSpeed = params.expectations.baseAdaptSpeed
+        + (1.0 - before.credibility) * params.expectations.credibilityAmplifier
+    let preCommunication = params.expectations.bounds.clamping(
+        adaptSpeed * after.inflation + (1.0 - adaptSpeed) * before.expectedInflation
+    )
+    let communicationContribution = after.expectedInflation - preCommunication
+    let phase = previewMode ? "would then" : "then"
+
+    return "Adaptive expectations alone would have moved expectations to \(percentText(preCommunication)) at a speed of \(String(format: "%.0f%%", adaptSpeed * 100)); communication \(phase) shift that path by \(ppText(communicationContribution))."
+}
+
+private func approximateEventInflationContribution(_ events: [EconomicEvent]) -> Double {
+    events.reduce(0.0) { partial, event in
+        switch event.type {
+        case .oilShock(let magnitude):
+            return partial + 0.030 * magnitude
+        case .oilRecovery(let magnitude):
+            return partial - 0.014 * magnitude
+        case .droughtOrDisaster:
+            return partial + 0.020
+        case .workerStrike:
+            return partial + 0.012
+        default:
+            return partial
+        }
+    }
+}
+
+private func approximateEventOutputGapContribution(_ events: [EconomicEvent]) -> Double {
+    events.reduce(0.0) { partial, event in
+        switch event.type {
+        case .oilShock(let magnitude):
+            return partial - 0.012 * magnitude
+        case .droughtOrDisaster:
+            return partial - 0.014
+        case .tourismBoom:
+            return partial + 0.005
+        case .tourismCollapse:
+            return partial - 0.008
+        case .workerStrike:
+            return partial - 0.012
+        case .creditCrunch:
+            return partial - 0.007
+        default:
+            return partial
+        }
+    }
+}
+
+private func ppText(_ value: Double) -> String {
+    percentagePointText(value, allowZero: true) ?? "+0.0pp"
+}
+
 private func failureDiagnosisSection(outcome: GameOutcome, simulator: EconomicSimulator) -> InfoSection? {
     let s = simulator.state
     let card = simulator.scoreCard
+    let hinge = hingeQuarterSnapshot(outcome: outcome, simulator: simulator)
 
     switch outcome {
     case .currencyCrisis:
+        let hingeRow = hinge.map {
+            String(format: "The run ended in %@, but it likely became unrecoverable around %@ when reserves were down to %.1f months and credibility to %.0f%%.", s.quarterLabel, $0.quarterLabel, $0.foreignReservesMonths, $0.credibility * 100)
+        } ?? "The run ended in \(s.quarterLabel), and it likely became unrecoverable around the point when reserves and credibility could no longer be rebuilt."
+        let hingeLever: String
+        if card.lowestCredibility < 0.45 {
+            hingeLever = "The real hinge was credibility: once it slipped under roughly 45%, later rate hikes stopped moving expectations enough to save the currency."
+        } else if card.peakCapitalControls < 0.45 && card.peakPolicyRate < 0.10 {
+            hingeLever = "The real hinge was early external defense: you never leaned hard enough on rates or controls while markets were still unsure."
+        } else {
+            hingeLever = "The real hinge was timing: by the time you defended in earnest, reserves were already too thin to make the defense believable."
+        }
         return InfoSection(
             heading: "FAILURE DIAGNOSIS",
             rows: [
-                String(format: "Reserves bottomed at %.1f months and credibility at %.0f%%. Once reserves are that thin, ordinary rate moves stop buying much time.", card.lowestReserves, card.lowestCredibility * 100),
+                hingeRow,
+                hingeLever,
                 String(format: "The external side was already failing: current account %+.1f%% GDP, capital account %+.1f%% GDP, with the SLD still under pressure.", s.currentAccountGDP * 100, s.capitalAccountGDP * 100),
                 "Next time, defend earlier: tighten or control flows before reserves fall inside roughly two months, and keep communication credible so the market does not test you for free."
             ]
         )
     case .hyperinflation:
+        let hingeRow = hinge.map {
+            String(format: "The run ended in %@, but it was probably lost around %@ when inflation had already reached %.1f%% and credibility had slipped to %.0f%%.", s.quarterLabel, $0.quarterLabel, $0.inflation * 100, $0.credibility * 100)
+        } ?? "The run ended in \(s.quarterLabel), and it was likely lost around the point when expectations could no longer be re-anchored."
+        let hingeLever = card.peakPolicyRate < 0.10
+            ? "The real hinge was the policy rate: you never tightened decisively enough while credibility was still spendable."
+            : "The real hinge was expectations management: once inflation stayed high for too many quarters, later tightening had to work through a much worse expectation base."
         return InfoSection(
             heading: "FAILURE DIAGNOSIS",
             rows: [
-                "Inflation stayed too hot for too long, which let expectations ratchet upward faster than later tightening could pull them back.",
+                hingeRow,
+                hingeLever,
                 String(format: "You logged %d quarters above 10%% inflation, %d above 20%%, and credibility sank to %.0f%%.", card.highInflationQuarters, card.severeInflationQuarters, card.lowestCredibility * 100),
                 "Next time, move earlier against spirals and avoid dovish or opaque messaging while inflation is still clearly above control."
             ]
         )
     case .depression:
+        let hingeRow = hinge.map {
+            String(format: "The run ended in %@, but it likely became unrecoverable around %@ when growth was already %+.1f%% and unemployment %.1f%%.", s.quarterLabel, $0.quarterLabel, $0.annualizedGDPGrowth * 100, $0.unemployment * 100)
+        } ?? "The run ended in \(s.quarterLabel), and it likely became unrecoverable around the point when demand support could no longer catch up."
+        let hingeLever = (card.peakPolicyRate > 0.15 || card.peakReserveRequirement > 0.16)
+            ? "The real hinge was easing sooner: the economy spent too long carrying an overtight real stance and high reserve drag once slack had clearly opened."
+            : "The real hinge was demand support: you never built enough recovery momentum before unemployment became politically and economically self-reinforcing."
         return InfoSection(
             heading: "FAILURE DIAGNOSIS",
             rows: [
-                String(format: "The economy spent %d quarters in recession, with growth troughing at %+.1f%% and unemployment peaking at %.1f%%.", card.recessionQuarters, card.troughGrowthAnnualized * 100, card.peakUnemployment * 100),
+                hingeRow,
+                hingeLever,
                 String(format: "Peak policy settings reached %.1f%% on rates and %.1f%% on reserve requirements, which suggests the economy stayed too tight for too long once slack opened up.", card.peakPolicyRate * 100, card.peakReserveRequirement * 100),
                 "Next time, ease earlier when slack is unmistakable and use communication to support recovery rather than defending a slowdown that is already entrenched."
             ]
         )
     case .politicalOuster:
+        let hingeRow = hinge.map {
+            String(format: "The run ended in %@, but the coalition probably broke around %@ when political pressure hit %.0f and approval was %.0f%%.", s.quarterLabel, $0.quarterLabel, $0.politicalPressure, $0.publicApproval)
+        } ?? "The run ended in \(s.quarterLabel), and political patience likely ran out around the point when the macro repair was no longer visible enough to save you."
         let dominantPain: String
         if card.peakInflation > 0.12 {
             dominantPain = "persistent inflation"
@@ -1986,14 +2228,52 @@ private func failureDiagnosisSection(outcome: GameOutcome, simulator: EconomicSi
         } else {
             dominantPain = "reserve and currency stress"
         }
+        let hingeLever = dominantPain == "persistent inflation"
+            ? "The real hinge was earlier visible inflation control. Once the public decided inflation was the story, later gains elsewhere no longer bought patience."
+            : dominantPain == "recession and unemployment"
+                ? "The real hinge was growth support. The economy stayed visibly weak for too long for your independence to survive."
+                : "The real hinge was credibility under stress. Markets and politics were both testing you, and neither side believed the stabilization would arrive in time."
         return InfoSection(
             heading: "FAILURE DIAGNOSIS",
             rows: [
-                String(format: "Political pressure peaked at %.0f / %.0f and spent %d quarters near ouster. The coalition for your policy ran out before the macro repair did.", card.peakPoliticalPressure, simulator.params.outcomes.politicalOusterPressure, card.nearOusterQuarters),
+                hingeRow,
+                hingeLever,
                 "The main political wound was \(dominantPain), not just the final headline number on your scorecard.",
                 "Next time, address the politically dominant problem earlier and keep communication aligned so you are not paying both economic pain and credibility damage at once."
             ]
         )
+    case .success, .ongoing:
+        return nil
+    }
+}
+
+private func hingeQuarterSnapshot(outcome: GameOutcome, simulator: EconomicSimulator) -> QuarterSnapshot? {
+    let snaps = simulator.log.quarterSnapshots
+    guard !snaps.isEmpty else { return nil }
+
+    switch outcome {
+    case .currencyCrisis:
+        return snaps.first {
+            $0.foreignReservesMonths <= max(2.0, simulator.params.outcomes.currencyCrisisReserves + 0.8)
+                || ($0.foreignReservesMonths <= 2.5 && $0.credibility <= 0.50)
+        } ?? snaps.last
+    case .hyperinflation:
+        return snaps.first {
+            $0.inflation >= 0.10 && $0.credibility <= 0.55
+        } ?? snaps.first {
+            $0.inflation >= 0.12
+        } ?? snaps.last
+    case .depression:
+        return snaps.first {
+            $0.annualizedGDPGrowth <= -0.03 && $0.unemployment >= 0.09
+        } ?? snaps.first {
+            $0.annualizedGDPGrowth <= -0.04
+        } ?? snaps.last
+    case .politicalOuster:
+        return snaps.first {
+            $0.politicalPressure >= simulator.params.outcomes.politicalOusterPressure * 0.80
+                || $0.publicApproval <= 35
+        } ?? snaps.last
     case .success, .ongoing:
         return nil
     }

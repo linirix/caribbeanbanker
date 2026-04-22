@@ -305,7 +305,7 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
 
         if months > 0 {
             return String(
-                format: "Bought %.2f months of FX reserves and sold SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f USD/SLD (%@).",
+                format: "Sold SLD to add %.2f mo of reserves. Reserves %.2f→%.2f mo. USD/SLD %.3f→%.3f (%@).",
                 months,
                 oldReserves,
                 newReserves,
@@ -315,10 +315,10 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
             )
         } else {
             let supportText = simulator.interventionSupportCarry > oldSupportCarry
-                ? " Temporary defense support has been added for the next quarter."
+                ? " Defense support added next quarter."
                 : ""
             return String(
-                format: "Sold %.2f months of FX reserves and bought SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f USD/SLD (%@).%@",
+                format: "Sold %.2f mo of reserves and bought SLD. Reserves %.2f→%.2f mo. USD/SLD %.3f→%.3f (%@).%@",
                 -months,
                 oldReserves,
                 newReserves,

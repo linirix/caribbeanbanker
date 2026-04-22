@@ -759,7 +759,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(snapshot.analysisSections.map(\.heading), [
             "Policy effect",
             "Shock effect",
-            "Expectation and communication"
+            "Expectation lag"
         ])
         XCTAssertTrue(analysisText.contains("Against holding policy steady"))
         XCTAssertTrue(analysisText.contains("expected inflation -0.3pp"))
@@ -781,9 +781,12 @@ final class EconomyTests: XCTestCase {
             .joined(separator: "\n")
 
         XCTAssertTrue(snapshot.analysisSections.map(\.heading).contains("Forecast review"))
-        XCTAssertTrue(analysisText.contains("Expected inflation"))
+        XCTAssertTrue(analysisText.contains("inherited expectation anchor"))
         XCTAssertTrue(analysisText.contains("Preview predicted inflation"))
         XCTAssertTrue(analysisText.contains("expected inflation -0.3pp"))
+        XCTAssertTrue(analysisText.contains("Demand channel"))
+        XCTAssertTrue(analysisText.contains("Adaptive expectations alone"))
+        XCTAssertTrue(analysisText.contains("Residual demand noise"))
     }
 
     func testRenderedGameOverFitsFrame() {
@@ -826,10 +829,13 @@ final class EconomyTests: XCTestCase {
 
         let snapshot = makeGameOverSnapshot(outcome: .currencyCrisis, simulator: sim, gameLength: .short)
         let rendered = renderGameOver(snapshot)
+        let diagnosisText = (snapshot.failureDiagnosisSection?.rows ?? []).joined(separator: "\n")
 
         XCTAssertEqual(snapshot.failureDiagnosisSection?.heading, "FAILURE DIAGNOSIS")
         XCTAssertTrue(rendered.contains("FAILURE DIAGNOSIS"))
-        XCTAssertTrue(rendered.contains("defend earlier"))
+        XCTAssertTrue(diagnosisText.contains("likely became unrecoverable around"))
+        XCTAssertTrue(diagnosisText.contains("The real hinge was"))
+        XCTAssertTrue(diagnosisText.contains("defend earlier"))
         assertRenderedScreenFits(rendered)
     }
 
@@ -1553,9 +1559,18 @@ final class EconomyTests: XCTestCase {
         XCTAssertGreaterThan(accumulating.state.exchangeRate, accumulateInitialRate,
                              "Accumulating reserves by selling SLD should raise SLD/USD and weaken the currency immediately.")
         XCTAssertGreaterThan(accumulating.state.foreignReservesMonths, accumulateInitialReserves)
-        XCTAssertEqual(accumulateMessage?.contains("sold SLD"), true)
+        XCTAssertEqual(accumulateMessage?.localizedCaseInsensitiveContains("sold SLD"), true)
         XCTAssertEqual(accumulateMessage?.contains("SLD weakened"), true)
         XCTAssertEqual(accumulateMessage?.contains("USD/SLD"), true)
+    }
+
+    func testWrappedStatusMessageFitsDashboardWidth() {
+        let sim = EconomicSimulator(seed: testSeed)
+        let message = applyCommand(.intervene(-0.75), simulator: sim)
+        let rows = statusMessageRows(message ?? "")
+
+        XCTAssertGreaterThan(rows.count, 1)
+        XCTAssertTrue(rows.allSatisfy { displayVisualWidth($0) <= displayFrameWidth })
     }
 
     func testAdvanceWithoutResponseTreatsCabinetRequestAsDelay() {
