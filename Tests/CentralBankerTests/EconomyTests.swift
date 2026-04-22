@@ -743,6 +743,49 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(snapshot.title.contains("STAFF FORECAST"))
     }
 
+    func testPreviewSnapshotIncludesCounterfactualAndCommunicationAnalysis() {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        session.simulator.communicationStance = .hawkish
+
+        let snapshot = session.makePreviewSnapshot(changes: [.rate(0.115)])
+        let analysisText = snapshot.analysisSections
+            .flatMap { [$0.heading] + $0.rows + $0.bullets }
+            .joined(separator: "\n")
+
+        XCTAssertEqual(snapshot.analysisSections.map(\.heading), [
+            "Policy effect",
+            "Shock effect",
+            "Expectation and communication"
+        ])
+        XCTAssertTrue(analysisText.contains("Against holding policy steady"))
+        XCTAssertTrue(analysisText.contains("expected inflation -0.3pp"))
+    }
+
+    func testDebriefSnapshotIncludesForecastReviewAndCommunicationAttribution() {
+        let session = GameSession(
+            mode: .historical,
+            gameLength: .short,
+            difficulty: .governor,
+            sessionSeed: testSeed)
+        session.simulator.communicationStance = .hawkish
+        _ = session.makePreviewSnapshot(changes: [.rate(0.115), .reserve(0.16)])
+        _ = session.advance()
+
+        let snapshot = session.makeDebriefSnapshot()
+        let analysisText = snapshot.analysisSections
+            .flatMap { [$0.heading] + $0.rows + $0.bullets }
+            .joined(separator: "\n")
+
+        XCTAssertTrue(snapshot.analysisSections.map(\.heading).contains("Forecast review"))
+        XCTAssertTrue(analysisText.contains("Expected inflation"))
+        XCTAssertTrue(analysisText.contains("Preview predicted inflation"))
+        XCTAssertTrue(analysisText.contains("expected inflation -0.3pp"))
+    }
+
     func testRenderedGameOverFitsFrame() {
         let sim = EconomicSimulator(seed: testSeed)
         sim.state.year = 1982
@@ -771,6 +814,23 @@ final class EconomyTests: XCTestCase {
         XCTAssertTrue(rendered.contains("YOU SURVIVED"))
         XCTAssertTrue(rendered.contains("FINAL STATE"))
         XCTAssertTrue(rendered.contains("SCORECARD"))
+    }
+
+    func testGameOverFailureDiagnosisAppearsForLosses() {
+        let sim = EconomicSimulator(seed: testSeed)
+        sim.state.foreignReservesMonths = 0.4
+        sim.state.currentAccountGDP = -0.061
+        sim.state.capitalAccountGDP = -0.028
+        sim.scoreCard.lowestReserves = 0.4
+        sim.scoreCard.lowestCredibility = 0.43
+
+        let snapshot = makeGameOverSnapshot(outcome: .currencyCrisis, simulator: sim, gameLength: .short)
+        let rendered = renderGameOver(snapshot)
+
+        XCTAssertEqual(snapshot.failureDiagnosisSection?.heading, "FAILURE DIAGNOSIS")
+        XCTAssertTrue(rendered.contains("FAILURE DIAGNOSIS"))
+        XCTAssertTrue(rendered.contains("defend earlier"))
+        assertRenderedScreenFits(rendered)
     }
 
     func testAdvisorSnapshotIncludesRequestedFocusAndRecommendations() {

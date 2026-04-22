@@ -405,6 +405,11 @@ func renderPreview(_ snapshot: PreviewSnapshot) -> String {
         lines.append(previewRow(projection))
     }
 
+    for section in snapshot.analysisSections {
+        lines.append(hline(ML, HH, MR))
+        appendInfoSection(&lines, section: section)
+    }
+
     lines.append(hline(ML, HH, MR))
     lines.append(frow(A.dim + "  " + snapshot.footerNote + A.reset))
     lines.append(hline(BL, HH, BR))
@@ -596,6 +601,11 @@ func renderGameOver(_ snapshot: GameOverSnapshot) -> String {
         appendWrappedText(&lines, row)
     }
 
+    if let failureDiagnosisSection = snapshot.failureDiagnosisSection {
+        lines.append(hline(ML, HH, MR))
+        appendInfoSection(&lines, section: failureDiagnosisSection)
+    }
+
     lines.append(hline(ML, HH, MR))
     lines.append(sectionHeadingRow(snapshot.scoreSection.heading))
     for row in snapshot.scoreSection.rows {
@@ -732,10 +742,17 @@ func renderQuarterDebrief(_ snapshot: DebriefSnapshot) -> String {
             appendWrappedText(&lines, row)
         }
         appendMetricList(&lines, title: "Main moves", metrics: snapshot.mainMoves)
-        lines.append(frow(""))
-        lines.append(frow(A.bold + "  Interpretation:" + A.reset))
-        for line in snapshot.interpretations {
-            appendWrappedText(&lines, line, indent: "    ")
+
+        for section in snapshot.analysisSections {
+            appendInfoSection(&lines, section: section)
+        }
+
+        if !snapshot.interpretations.isEmpty {
+            lines.append(frow(""))
+            lines.append(frow(A.bold + "  Bottom line:" + A.reset))
+            for line in snapshot.interpretations {
+                appendWrappedText(&lines, line, indent: "    ")
+            }
         }
         if !snapshot.headlines.isEmpty {
             lines.append(frow(""))

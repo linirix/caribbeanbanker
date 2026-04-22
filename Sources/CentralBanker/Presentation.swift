@@ -137,6 +137,7 @@ package struct PreviewSnapshot {
     let explanation: String
     let eventHeadlines: [String]
     let projections: [ComparisonDescriptor]
+    let analysisSections: [InfoSection]
     let footerNote: String
 }
 
@@ -190,6 +191,7 @@ package struct DebriefSnapshot {
     let title: String
     let summaryRows: [String]
     let mainMoves: [MetricDescriptor]
+    let analysisSections: [InfoSection]
     let interpretations: [String]
     let headlines: [String]
 }
@@ -276,6 +278,7 @@ package struct GameOverSnapshot {
     let scenarioGoals: [ScenarioGoalDescriptor]
     let scenarioAssessment: ScenarioAssessmentSnapshot?
     let reviewSection: InfoSection
+    let failureDiagnosisSection: InfoSection?
     let scoreSection: InfoSection
 }
 
@@ -304,7 +307,8 @@ extension GameSession {
         return buildPreviewSnapshot(
             estimate: preview.estimate,
             context: makePresentationSnapshot(),
-            headerNote: preview.note
+            headerNote: preview.note,
+            baselineEstimate: pendingPreviewReview?.baselineEstimate
         )
     }
 
@@ -329,7 +333,9 @@ extension GameSession {
     func makeDebriefSnapshot() -> DebriefSnapshot {
         buildDebriefSnapshot(
             simulator: simulator,
-            context: makePresentationSnapshot()
+            context: makePresentationSnapshot(),
+            report: lastQuarterReport,
+            forecastReview: lastForecastReview
         )
     }
 
@@ -402,11 +408,13 @@ func makeDashboardSnapshot(simulator: EconomicSimulator,
 func makePreviewSnapshot(estimate: ForecastEstimate,
                          gameLength: GameLength = .short,
                          scenarioID: String? = nil,
-                         headerNote: String? = nil) -> PreviewSnapshot {
+                         headerNote: String? = nil,
+                         baselineEstimate: ForecastEstimate? = nil) -> PreviewSnapshot {
     buildPreviewSnapshot(
         estimate: estimate,
         context: makePresentationContext(simulator: nil, gameLength: gameLength, scenarioID: scenarioID, quarterLabel: estimate.estimatedAfter.quarterLabel),
-        headerNote: headerNote
+        headerNote: headerNote,
+        baselineEstimate: baselineEstimate
     )
 }
 
@@ -437,7 +445,9 @@ func makeDebriefSnapshot(simulator: EconomicSimulator,
                          scenarioID: String? = nil) -> DebriefSnapshot {
     buildDebriefSnapshot(
         simulator: simulator,
-        context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID)
+        context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
+        report: nil,
+        forecastReview: nil
     )
 }
 
@@ -1072,10 +1082,12 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
 
 private func buildPreviewSnapshot(estimate: ForecastEstimate,
                                   context: GamePresentationSnapshot,
-                                  headerNote: String?) -> PreviewSnapshot {
+                                  headerNote: String?,
+                                  baselineEstimate: ForecastEstimate? = nil) -> PreviewSnapshot {
     let report = estimate.report
     let before = report.stateBefore
     let after = estimate.estimatedAfter
+    let eventHeadlines = report.news.filter(isPresentationEventHeadline)
 
     return PreviewSnapshot(
         context: context,
@@ -1083,7 +1095,7 @@ private func buildPreviewSnapshot(estimate: ForecastEstimate,
         subtitle: "(dry run, no state changed)",
         headerNote: headerNote,
         explanation: "Forecasts are approximate. Realized data may differ modestly next quarter.",
-        eventHeadlines: report.news.filter(isPresentationEventHeadline),
+        eventHeadlines: eventHeadlines,
         projections: [
             comparisonDescriptor(id: "inflation", label: "Inflation", before: before.inflation, after: after.inflation, style: .pct),
             comparisonDescriptor(id: "expected-inflation", label: "Expected infl.", before: before.expectedInflation, after: after.expectedInflation, style: .pct),
@@ -1096,6 +1108,14 @@ private func buildPreviewSnapshot(estimate: ForecastEstimate,
             comparisonDescriptor(id: "pressure", label: "Political press.", before: before.politicalPressure, after: after.politicalPressure, style: .score),
             comparisonDescriptor(id: "approval", label: "Public approval", before: before.publicApproval, after: after.publicApproval, style: .score)
         ],
+        analysisSections: previewAnalysisSections(
+            before: before,
+            after: after,
+            report: report,
+            headerNote: headerNote,
+            baselineEstimate: baselineEstimate,
+            eventHeadlines: eventHeadlines
+        ),
         footerNote: "Press any key to return to dashboard — no changes have been applied."
     )
 }
@@ -1204,7 +1224,9 @@ private func buildReportSnapshot(simulator: EconomicSimulator,
 }
 
 private func buildDebriefSnapshot(simulator: EconomicSimulator,
-                                  context: GamePresentationSnapshot) -> DebriefSnapshot {
+                                  context: GamePresentationSnapshot,
+                                  report: QuarterReport?,
+                                  forecastReview: ForecastReviewRecord?) -> DebriefSnapshot {
     let snaps = simulator.log.quarterSnapshots
     guard let last = snaps.last else {
         return DebriefSnapshot(
@@ -1212,16 +1234,21 @@ private func buildDebriefSnapshot(simulator: EconomicSimulator,
             title: "WHY THINGS MOVED",
             summaryRows: ["No completed quarter yet — advance once to get a debrief."],
             mainMoves: [],
+            analysisSections: [],
             interpretations: [],
             headlines: []
         )
     }
 
     let previous = snaps.dropLast().last
+    let reportToExplain = report ?? syntheticQuarterReport(from: simulator, lastSnapshot: last, previousSnapshot: previous)
     let quarterEntries = Array(Array(simulator.log.fullNewsLog
         .filter { $0.hasPrefix("[\(last.quarterLabel)]") }
         .prefix(8))
         .reversed())
+    let eventHeadlines = quarterEntries
+        .filter(isPresentationQuarterHeadline)
+        .map(strippingQuarterPrefix)
     let s = simulator.state
     let inflationMove = s.inflationDelta * 100
     let expectedMove = s.expectedInflationDelta * 100
@@ -1247,6 +1274,13 @@ private func buildDebriefSnapshot(simulator: EconomicSimulator,
             MetricDescriptor(id: "debrief-approval", label: "Approval", primaryValue: String(format: "%+.1f", approvalMove), deltaText: nil, trend: nil, severity: approvalMove > 0 ? .good : (approvalMove < 0 ? .warning : .neutral), note: nil, numericValue: approvalMove, displayStyle: .plain),
             MetricDescriptor(id: "debrief-pressure", label: "Political pressure", primaryValue: String(format: "%+.1f", pressureMove), deltaText: nil, trend: nil, severity: pressureMove > 0 ? .danger : (pressureMove < 0 ? .good : .neutral), note: nil, numericValue: pressureMove, displayStyle: .plain)
         ],
+        analysisSections: debriefAnalysisSections(
+            simulator: simulator,
+            report: reportToExplain,
+            rawQuarterEntries: quarterEntries,
+            eventHeadlines: eventHeadlines,
+            forecastReview: forecastReview
+        ),
         interpretations: debriefInterpretations(
             simulator: simulator,
             lastQuarterEntries: quarterEntries,
@@ -1651,11 +1685,377 @@ private func buildGameOverSnapshot(outcome: GameOutcome,
                 String(format: "Peak capital controls: %.0f / 10", card.peakCapitalControls * 10)
             ]
         ),
+        failureDiagnosisSection: failureDiagnosisSection(outcome: outcome, simulator: simulator),
         scoreSection: InfoSection(
             heading: "SCORECARD",
             rows: scoreRows
         )
     )
+}
+
+private func previewAnalysisSections(before: EconomicState,
+                                     after: EconomicState,
+                                     report: QuarterReport,
+                                     headerNote: String?,
+                                     baselineEstimate: ForecastEstimate?,
+                                     eventHeadlines: [String]) -> [InfoSection] {
+    [
+        InfoSection(
+            heading: "Policy effect",
+            rows: previewPolicyRows(
+                before: before,
+                after: after,
+                headerNote: headerNote,
+                baselineEstimate: baselineEstimate
+            )
+        ),
+        InfoSection(
+            heading: "Shock effect",
+            rows: previewShockRows(eventHeadlines: eventHeadlines),
+            bullets: eventHeadlines
+        ),
+        InfoSection(
+            heading: "Expectation and communication",
+            rows: expectationAndCommunicationRows(
+                before: before,
+                after: after,
+                news: report.news,
+                previewMode: true
+            )
+        )
+    ]
+}
+
+private func debriefAnalysisSections(simulator: EconomicSimulator,
+                                     report: QuarterReport,
+                                     rawQuarterEntries: [String],
+                                     eventHeadlines: [String],
+                                     forecastReview: ForecastReviewRecord?) -> [InfoSection] {
+    var sections: [InfoSection] = [
+        InfoSection(
+            heading: "Policy effect",
+            rows: debriefPolicyRows(simulator: simulator, before: report.stateBefore)
+        ),
+        InfoSection(
+            heading: "Shock effect",
+            rows: debriefShockRows(eventHeadlines: eventHeadlines),
+            bullets: eventHeadlines
+        ),
+        InfoSection(
+            heading: "Expectation and communication",
+            rows: expectationAndCommunicationRows(
+                before: report.stateBefore,
+                after: report.stateAfter,
+                news: rawQuarterEntries,
+                previewMode: false
+            )
+        )
+    ]
+
+    if let forecastReview {
+        sections.append(
+            InfoSection(
+                heading: "Forecast review",
+                rows: forecastReviewRows(
+                    forecastReview,
+                    actual: report.stateAfter
+                )
+            )
+        )
+    }
+
+    return sections
+}
+
+private func previewPolicyRows(before: EconomicState,
+                               after: EconomicState,
+                               headerNote: String?,
+                               baselineEstimate: ForecastEstimate?) -> [String] {
+    var rows: [String] = []
+
+    if let headerNote {
+        rows.append("This forecast assumes: \(headerNote.replacingOccurrences(of: "Hypothetical: ", with: "")).")
+    } else {
+        rows.append("This is the hold-steady control case: no new lever changes are applied before the quarter runs.")
+    }
+
+    if after.policyRate > before.policyRate + 0.0001 {
+        rows.append("A higher policy rate should cool demand with a lag and strengthen the disinflation signal if credibility holds.")
+    } else if after.policyRate < before.policyRate - 0.0001 {
+        rows.append("A lower policy rate should cushion growth, but it also leaves you with less inflation and currency defense next quarter.")
+    }
+
+    if after.reserveRequirement > before.reserveRequirement + 0.0001 {
+        rows.append("A higher reserve requirement restrains bank credit and imports, though sustained use will shave growth.")
+    } else if after.reserveRequirement < before.reserveRequirement - 0.0001 {
+        rows.append("A lower reserve requirement supports credit and domestic demand, but it also loosens the external side.")
+    }
+
+    if after.capitalControls > before.capitalControls + 0.0001 {
+        rows.append("Tighter capital controls buy short-run external breathing room, but the political and credibility tax rises if you leave them in place.")
+    } else if after.capitalControls < before.capitalControls - 0.0001 {
+        rows.append("Looser capital controls reduce the long-run drag, but they also expose the currency to a faster market test.")
+    }
+
+    if let baselineEstimate {
+        rows.append(counterfactualPreviewRow(planAfter: after, baselineAfter: baselineEstimate.estimatedAfter))
+    }
+
+    return rows
+}
+
+private func previewShockRows(eventHeadlines: [String]) -> [String] {
+    if eventHeadlines.isEmpty {
+        return ["No named shock is scheduled in this preview. Most movement is endogenous: policy lags, expectations, and balance-of-payments persistence."]
+    }
+    return ["Named shocks are expected this quarter, so compare your lever choice against the same shock path rather than treating the forecast as purely policy-driven."]
+}
+
+private func debriefPolicyRows(simulator: EconomicSimulator, before: EconomicState) -> [String] {
+    let neutralRealRate = simulator.params.outputGap.neutralRealRate
+    let realRateGap = before.realInterestRate - neutralRealRate
+    var rows: [String] = []
+
+    if realRateGap > 0.012 {
+        rows.append(String(format: "Policy started the quarter clearly restrictive: real rate %+.1f%% versus an estimated neutral rate near %+.1f%%.", before.realInterestRate * 100, neutralRealRate * 100))
+    } else if realRateGap < -0.010 {
+        rows.append(String(format: "Policy started the quarter soft in real terms: real rate %+.1f%% versus an estimated neutral rate near %+.1f%%.", before.realInterestRate * 100, neutralRealRate * 100))
+    } else {
+        rows.append(String(format: "Policy started near neutral: real rate %+.1f%% against a neutral benchmark near %+.1f%%, so other forces mattered a lot.", before.realInterestRate * 100, neutralRealRate * 100))
+    }
+
+    if before.reserveRequirement >= 0.16 {
+        rows.append("Reserve requirements were high enough to restrain credit growth and some import demand.")
+    }
+
+    if before.capitalControls >= 0.55 {
+        rows.append("Capital controls were doing part of the external-defense work, which helped the balance of payments but carried its own drag and credibility cost.")
+    }
+
+    return rows
+}
+
+private func debriefShockRows(eventHeadlines: [String]) -> [String] {
+    if eventHeadlines.isEmpty {
+        return ["No named shock hit this quarter. Most of the movement came from policy lags, expectations, and the external position you were already carrying."]
+    }
+    return ["These shocks hit on top of your policy stance, so not every move this quarter should be read as a direct consequence of your last decision."]
+}
+
+private func expectationAndCommunicationRows(before: EconomicState,
+                                             after: EconomicState,
+                                             news: [String],
+                                             previewMode: Bool) -> [String] {
+    var rows = [
+        "Expected inflation \(previewMode ? "is projected to move" : "moved") from \(percentText(before.expectedInflation)) to \(percentText(after.expectedInflation))."
+    ]
+
+    if before.credibility < 0.50 {
+        rows.append(String(format: "Credibility began the quarter weak at %.0f%%, so expectations were always likely to adjust only slowly.", before.credibility * 100))
+    } else if before.credibility < 0.65 {
+        rows.append(String(format: "Credibility began the quarter at %.0f%%, so expectations still carry noticeable inertia.", before.credibility * 100))
+    }
+
+    rows.append(contentsOf: communicationContributionRows(after: after, news: news, previewMode: previewMode))
+    return rows
+}
+
+private func communicationContributionRows(after: EconomicState,
+                                           news: [String],
+                                           previewMode: Bool) -> [String] {
+    let communicationLine = news
+        .map(strippingQuarterPrefix)
+        .first { $0.hasPrefix("COMMUNICATION:") }
+
+    guard let communicationLine else {
+        return ["Communication stayed balanced this quarter, so there was no separate messaging shock on expectations or credibility."]
+    }
+
+    let phase = previewMode ? "is projected to" : "did"
+    if communicationLine.contains("reinforced by policy stance") {
+        let pressureBump = (after.inflation > 0.10 || after.outputGap > 0.02) ? 0.5 : 2.0
+        return [
+            "Communication \(phase) matter here: hawkish guidance aligned with policy, implying roughly credibility +1.0pp, expected inflation -0.3pp, and political pressure \(String(format: "%+.1f", pressureBump))."
+        ]
+    }
+    if communicationLine.contains("rings hollow") {
+        let pressureBump = (after.inflation > 0.10 || after.outputGap > 0.02) ? 0.5 : 2.0
+        return [
+            "Communication \(phase) matter here: hawkish rhetoric was not backed by policy, implying roughly credibility -1.5pp, expected inflation +0.2pp, and political pressure \(String(format: "%+.1f", pressureBump))."
+        ]
+    }
+    if communicationLine.contains("measured reassurance") {
+        return [
+            "Communication did real work here: dovish guidance fit the slack economy, buying roughly approval +2.0, pressure -2.5, credibility +0.8pp, and expected inflation -0.2pp."
+        ]
+    }
+    if communicationLine.contains("unsettles markets") {
+        return [
+            "Communication made things worse: dovish guidance against inflation or currency stress implied roughly credibility -1.8pp, expected inflation +0.6pp, and pressure +0.5."
+        ]
+    }
+    if communicationLine.contains("modest political goodwill") {
+        return [
+            "Communication mostly bought political cover: dovish reassurance implied roughly approval +1.5 and pressure -2.0, but it did not meaningfully re-anchor expectations."
+        ]
+    }
+    if communicationLine.contains("leaves markets uneasy") {
+        return [
+            "Communication bought short-term room but at a cost: opaque guidance implied roughly credibility -0.8pp and pressure -1.0."
+        ]
+    }
+    return ["Communication had a visible effect this quarter, though the exact mix was dominated by surrounding macro conditions."]
+}
+
+private func forecastReviewRows(_ review: ForecastReviewRecord, actual: EconomicState) -> [String] {
+    let predicted = review.estimate.estimatedAfter
+    let inflationError = abs(predicted.inflation - actual.inflation)
+    let expectedError = abs(predicted.expectedInflation - actual.expectedInflation)
+    let gapError = abs(predicted.outputGap - actual.outputGap)
+    let reservesError = abs(predicted.foreignReservesMonths - actual.foreignReservesMonths)
+    let withinBounds = inflationError <= 0.0035
+        && expectedError <= 0.0030
+        && gapError <= 0.0050
+        && reservesError <= 0.25
+
+    var rows = [
+        "Preview predicted inflation at \(percentText(predicted.inflation)). Actual inflation printed \(percentText(actual.inflation)).",
+        withinBounds
+            ? "Forecast error stayed within normal model bounds; the preview was directionally trustworthy."
+            : "Forecast error ran wider than normal model bounds, so shocks or expectation lag dominated more than the preview implied."
+    ]
+
+    if let baseline = review.baselineEstimate {
+        rows.append(counterfactualActualRow(predictedAfter: predicted, actualAfter: actual, baselineAfter: baseline.estimatedAfter))
+    }
+
+    return rows
+}
+
+private func counterfactualPreviewRow(planAfter: EconomicState, baselineAfter: EconomicState) -> String {
+    let strongerWeaker = displayedExchangeRate(planAfter.exchangeRate) >= displayedExchangeRate(baselineAfter.exchangeRate) ? "stronger" : "weaker"
+    return "Against holding policy steady, this plan is forecast to put inflation at \(percentText(planAfter.inflation)) instead of \(percentText(baselineAfter.inflation)), reserves at \(String(format: "%.2f", planAfter.foreignReservesMonths)) instead of \(String(format: "%.2f", baselineAfter.foreignReservesMonths)) months, and the SLD \(strongerWeaker)."
+}
+
+private func counterfactualActualRow(predictedAfter: EconomicState,
+                                     actualAfter: EconomicState,
+                                     baselineAfter: EconomicState) -> String {
+    let planGain = baselineAfter.inflation - predictedAfter.inflation
+    let actualGain = baselineAfter.inflation - actualAfter.inflation
+    return "Against the hold-steady counterfactual, the preview said your plan would improve inflation by \(String(format: "%.1f", planGain * 100))pp; the realized improvement came in at \(String(format: "%.1f", actualGain * 100))pp."
+}
+
+private func failureDiagnosisSection(outcome: GameOutcome, simulator: EconomicSimulator) -> InfoSection? {
+    let s = simulator.state
+    let card = simulator.scoreCard
+
+    switch outcome {
+    case .currencyCrisis:
+        return InfoSection(
+            heading: "FAILURE DIAGNOSIS",
+            rows: [
+                String(format: "Reserves bottomed at %.1f months and credibility at %.0f%%. Once reserves are that thin, ordinary rate moves stop buying much time.", card.lowestReserves, card.lowestCredibility * 100),
+                String(format: "The external side was already failing: current account %+.1f%% GDP, capital account %+.1f%% GDP, with the SLD still under pressure.", s.currentAccountGDP * 100, s.capitalAccountGDP * 100),
+                "Next time, defend earlier: tighten or control flows before reserves fall inside roughly two months, and keep communication credible so the market does not test you for free."
+            ]
+        )
+    case .hyperinflation:
+        return InfoSection(
+            heading: "FAILURE DIAGNOSIS",
+            rows: [
+                "Inflation stayed too hot for too long, which let expectations ratchet upward faster than later tightening could pull them back.",
+                String(format: "You logged %d quarters above 10%% inflation, %d above 20%%, and credibility sank to %.0f%%.", card.highInflationQuarters, card.severeInflationQuarters, card.lowestCredibility * 100),
+                "Next time, move earlier against spirals and avoid dovish or opaque messaging while inflation is still clearly above control."
+            ]
+        )
+    case .depression:
+        return InfoSection(
+            heading: "FAILURE DIAGNOSIS",
+            rows: [
+                String(format: "The economy spent %d quarters in recession, with growth troughing at %+.1f%% and unemployment peaking at %.1f%%.", card.recessionQuarters, card.troughGrowthAnnualized * 100, card.peakUnemployment * 100),
+                String(format: "Peak policy settings reached %.1f%% on rates and %.1f%% on reserve requirements, which suggests the economy stayed too tight for too long once slack opened up.", card.peakPolicyRate * 100, card.peakReserveRequirement * 100),
+                "Next time, ease earlier when slack is unmistakable and use communication to support recovery rather than defending a slowdown that is already entrenched."
+            ]
+        )
+    case .politicalOuster:
+        let dominantPain: String
+        if card.peakInflation > 0.12 {
+            dominantPain = "persistent inflation"
+        } else if card.peakUnemployment > 0.10 || card.recessionQuarters >= 4 {
+            dominantPain = "recession and unemployment"
+        } else {
+            dominantPain = "reserve and currency stress"
+        }
+        return InfoSection(
+            heading: "FAILURE DIAGNOSIS",
+            rows: [
+                String(format: "Political pressure peaked at %.0f / %.0f and spent %d quarters near ouster. The coalition for your policy ran out before the macro repair did.", card.peakPoliticalPressure, simulator.params.outcomes.politicalOusterPressure, card.nearOusterQuarters),
+                "The main political wound was \(dominantPain), not just the final headline number on your scorecard.",
+                "Next time, address the politically dominant problem earlier and keep communication aligned so you are not paying both economic pain and credibility damage at once."
+            ]
+        )
+    case .success, .ongoing:
+        return nil
+    }
+}
+
+private func syntheticQuarterReport(from simulator: EconomicSimulator,
+                                    lastSnapshot: QuarterSnapshot,
+                                    previousSnapshot: QuarterSnapshot?) -> QuarterReport {
+    let before = economicState(from: previousSnapshot ?? lastSnapshot)
+    let after = economicState(from: lastSnapshot)
+    let news = Array(Array(simulator.log.fullNewsLog
+        .filter { $0.hasPrefix("[\(lastSnapshot.quarterLabel)]") }
+        .prefix(8))
+        .reversed())
+        .map(strippingQuarterPrefix)
+    return QuarterReport(
+        stateBefore: before,
+        stateAfter: after,
+        events: [],
+        news: news
+    )
+}
+
+private func economicState(from snapshot: QuarterSnapshot) -> EconomicState {
+    var state = EconomicState()
+    state.inflation = snapshot.inflation
+    state.expectedInflation = snapshot.inflation
+    state.outputGap = 0.0
+    state.gdpGrowthQoQ = snapshot.annualizedGDPGrowth / 4.0
+    state.unemployment = snapshot.unemployment
+    state.foreignReservesMonths = snapshot.foreignReservesMonths
+    state.policyRate = snapshot.policyRate
+    state.capitalControls = snapshot.capitalControls
+    state.exchangeRate = snapshot.exchangeRate
+    state.credibility = snapshot.credibility
+    state.publicApproval = snapshot.publicApproval
+    state.politicalPressure = snapshot.politicalPressure
+    if let parsed = parseQuarterLabel(snapshot.quarterLabel) {
+        state.quarter = parsed.quarter
+        state.year = parsed.year
+    }
+    return state
+}
+
+private func parseQuarterLabel(_ label: String) -> (quarter: Int, year: Int)? {
+    let parts = label.split(separator: " ")
+    guard parts.count == 2,
+          let quarter = Int(parts[0].dropFirst()),
+          let year = Int(parts[1]) else {
+        return nil
+    }
+    return (quarter, year)
+}
+
+private func strippingQuarterPrefix(_ text: String) -> String {
+    guard text.first == "[", let closing = text.firstIndex(of: "]") else { return text }
+    let afterBracket = text.index(after: closing)
+    return text[afterBracket...].trimmingCharacters(in: .whitespaces)
+}
+
+private func isPresentationQuarterHeadline(_ text: String) -> Bool {
+    isPresentationEventHeadline(strippingQuarterPrefix(text))
 }
 
 func scenarioAssessmentSnapshot(for scenario: ScenarioDefinition,

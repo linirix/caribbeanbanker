@@ -1,5 +1,11 @@
 import Foundation
 
+struct ForecastReviewRecord {
+    let estimate: ForecastEstimate
+    let note: String?
+    let baselineEstimate: ForecastEstimate?
+}
+
 final class GameSession {
     private(set) var mode: GameMode
     private(set) var gameLength: GameLength
@@ -9,6 +15,9 @@ final class GameSession {
     private(set) var simulator: EconomicSimulator
     private(set) var macroSchedule: [Int: [EventType]]
     private(set) var rateSchedule: [Int: Double]
+    private(set) var lastQuarterReport: QuarterReport? = nil
+    private(set) var lastForecastReview: ForecastReviewRecord? = nil
+    private(set) var pendingPreviewReview: ForecastReviewRecord? = nil
 
     var scenario: ScenarioDefinition? {
         scenarioDefinition(id: scenarioID)
@@ -139,6 +148,10 @@ final class GameSession {
 
     @discardableResult
     func advance() -> GameOutcome {
+        let quarterBeingAdvanced = simulator.state.quarterLabel
+        let matchingForecast = pendingPreviewReview?.estimate.report.stateBefore.quarterLabel == quarterBeingAdvanced
+            ? pendingPreviewReview
+            : nil
         simulator.deferCabinetRequestIfNeeded()
         simulator.environment.worldInterestRate = worldInterestRate(
             for: simulator.state,
@@ -151,7 +164,10 @@ final class GameSession {
             gameLength: gameLength,
             macroSchedule: macroSchedule,
             using: &simulator.rng)
-        simulator.simulateQuarter(events: events)
+        let report = simulator.simulateQuarter(events: events)
+        lastQuarterReport = report
+        lastForecastReview = matchingForecast
+        pendingPreviewReview = nil
 
         let outcome = currentOutcome()
         if outcome == .ongoing {
@@ -161,6 +177,17 @@ final class GameSession {
     }
 
     func preview(changes: [PolicyChange]) -> (estimate: ForecastEstimate, note: String?) {
+        let preview = buildPreview(changes: changes)
+        let baselineEstimate = changes.isEmpty ? nil : buildPreview(changes: []).estimate
+        pendingPreviewReview = ForecastReviewRecord(
+            estimate: preview.estimate,
+            note: preview.note,
+            baselineEstimate: baselineEstimate
+        )
+        return preview
+    }
+
+    private func buildPreview(changes: [PolicyChange]) -> (estimate: ForecastEstimate, note: String?) {
         let clone = simulator.cloneForPreview()
         var note: String? = nil
         if !changes.isEmpty {
