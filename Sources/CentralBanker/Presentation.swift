@@ -935,7 +935,7 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
                         deltaText: percentText(displayedExchangeRateQoQChange(s.exchangeRateQoQChange)),
                         trend: nil,
                         severity: exchangeRateSeverity(s.exchangeRateQoQChange),
-                        note: "positive = stronger",
+                        note: nil,
                         numericValue: s.exchangeRate,
                         displayStyle: .plain),
                     right: MetricDescriptor(
@@ -1771,7 +1771,7 @@ private func comparisonDescriptor(id: String,
             afterValue: String(format: "%.3f USD/SLD", displayedAfter),
             deltaText: String(format: "%+.3f", displayedDelta),
             severity: displayedSeverity,
-            note: "positive = stronger SLD"
+            note: nil
         )
     case .score:
         return ComparisonDescriptor(

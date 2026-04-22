@@ -33,7 +33,7 @@ struct EconomicState: Codable {
     var credibility: Double = 0.70        // 0–1
 
     // --- External financial position ---
-    var exchangeRate: Double = 2.00       // SLD per USD
+    var exchangeRate: Double = 1.00       // SLD per USD
     var exchangeRateQoQChange: Double = 0.0
     var currentAccountGDP: Double = -0.025
     var capitalAccountGDP: Double = 0.008

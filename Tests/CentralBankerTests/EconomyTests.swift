@@ -214,6 +214,13 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(GameConfigs.scenario(id: "bretton_break_1971")?.title, "Bretton Woods Break")
     }
 
+    func testOpeningExchangeRateStartsAtParity() {
+        XCTAssertEqual(EconomicState().exchangeRate, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(GameConfigs.openingBaseline(for: .short).exchangeRate, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(GameConfigs.openingBaseline(for: .extended).exchangeRate, 1.0, accuracy: 1e-12)
+        XCTAssertEqual(displayedExchangeRate(EconomicState().exchangeRate), 1.0, accuracy: 1e-12)
+    }
+
     func testConfigCoverageIncludesAllCurrentEnumCases() {
         for difficulty in Difficulty.allCases {
             XCTAssertNotNil(GameConfigs.tuning.difficulties[difficulty.rawValue] ?? GameTuningConfig.fallback.difficulties[difficulty.rawValue],
