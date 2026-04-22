@@ -1,6 +1,6 @@
 import Foundation
 
-enum CabinetRequestType: String, Codable {
+enum CabinetRequestType: String, Codable, CaseIterable {
     case cutRates
     case tightenControls
     case defendCurrency

@@ -214,6 +214,36 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(GameConfigs.scenario(id: "bretton_break_1971")?.title, "Bretton Woods Break")
     }
 
+    func testConfigCoverageIncludesAllCurrentEnumCases() {
+        for difficulty in Difficulty.allCases {
+            XCTAssertNotNil(GameConfigs.tuning.difficulties[difficulty.rawValue] ?? GameTuningConfig.fallback.difficulties[difficulty.rawValue],
+                            "Missing difficulty config coverage for \(difficulty.rawValue)")
+            XCTAssertNotNil(GameTuningConfig.fallback.difficulties[difficulty.rawValue],
+                            "Fallback config is missing difficulty \(difficulty.rawValue)")
+        }
+
+        for gameLength in GameLength.allCases {
+            XCTAssertNotNil(GameConfigs.tuning.opening.baselines[gameLength.rawValue] ?? GameTuningConfig.fallback.opening.baselines[gameLength.rawValue],
+                            "Missing opening baseline coverage for \(gameLength.rawValue)")
+            XCTAssertNotNil(GameTuningConfig.fallback.opening.baselines[gameLength.rawValue],
+                            "Fallback config is missing opening baseline \(gameLength.rawValue)")
+        }
+
+        for request in CabinetRequestType.allCases {
+            XCTAssertNotNil(GameConfigs.tuning.cabinet.requests[request.rawValue] ?? GameTuningConfig.fallback.cabinet.requests[request.rawValue],
+                            "Missing cabinet request coverage for \(request.rawValue)")
+            XCTAssertNotNil(GameTuningConfig.fallback.cabinet.requests[request.rawValue],
+                            "Fallback config is missing cabinet request \(request.rawValue)")
+        }
+
+        for measure in CrisisMeasureType.allCases {
+            XCTAssertNotNil(GameConfigs.tuning.crisis.measures[measure.rawValue] ?? GameTuningConfig.fallback.crisis.measures[measure.rawValue],
+                            "Missing crisis measure coverage for \(measure.rawValue)")
+            XCTAssertNotNil(GameTuningConfig.fallback.crisis.measures[measure.rawValue],
+                            "Fallback config is missing crisis measure \(measure.rawValue)")
+        }
+    }
+
     func testScenarioCatalogIsExpandedAcrossBothTimelines() {
         XCTAssertGreaterThanOrEqual(scenarioDefinitions(for: .short).count, 8)
         XCTAssertGreaterThanOrEqual(scenarioDefinitions(for: .extended).count, 4)
@@ -503,6 +533,13 @@ final class EconomyTests: XCTestCase {
         )
 
         XCTAssertEqual(reserveMetric.trend, .down)
+        let exchangeRateMetric = try XCTUnwrap(
+            snapshot.metricSections
+                .flatMap(\.rows)
+                .compactMap(\.left)
+                .first(where: { $0.id == "exchange-rate" })
+        )
+        XCTAssertTrue(exchangeRateMetric.primaryValue.contains("USD/SLD"))
     }
 
     func testRenderedDashboardShowsAvailableCrisisMeasureNames() {
@@ -1439,6 +1476,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertLessThan(defending.state.foreignReservesMonths, defendInitialReserves)
         XCTAssertEqual(defendMessage?.localizedCaseInsensitiveContains("bought SLD"), true)
         XCTAssertEqual(defendMessage?.contains("SLD strengthened"), true)
+        XCTAssertEqual(defendMessage?.contains("USD/SLD"), true)
 
         let accumulating = EconomicSimulator(seed: testSeed)
         let accumulateInitialRate = accumulating.state.exchangeRate
@@ -1450,6 +1488,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertGreaterThan(accumulating.state.foreignReservesMonths, accumulateInitialReserves)
         XCTAssertEqual(accumulateMessage?.contains("sold SLD"), true)
         XCTAssertEqual(accumulateMessage?.contains("SLD weakened"), true)
+        XCTAssertEqual(accumulateMessage?.contains("USD/SLD"), true)
     }
 
     func testAdvanceWithoutResponseTreatsCabinetRequestAsDelay() {
@@ -1535,6 +1574,21 @@ final class EconomyTests: XCTestCase {
                        "Advance after preview should reproduce the previewed inflation.")
         XCTAssertEqual(sim.state.outputGap, preview.stateAfter.outputGap, accuracy: 1e-12,
                        "Advance after preview should reproduce the previewed output gap.")
+    }
+
+    func testPreviewCloneOwnsIndependentLogAndScoreCopies() {
+        let sim = EconomicSimulator(seed: testSeed)
+        let initialNewsCount = sim.log.newsLog.count
+        let initialQuarters = sim.scoreCard.quartersSimulated
+
+        let clone = sim.cloneForPreview()
+        clone.log.addNews("Preview-only note", quarterLabel: clone.state.quarterLabel)
+        clone.scoreCard.quartersSimulated = 99
+
+        XCTAssertEqual(sim.log.newsLog.count, initialNewsCount)
+        XCTAssertEqual(sim.scoreCard.quartersSimulated, initialQuarters)
+        XCTAssertEqual(clone.log.newsLog.count, initialNewsCount + 1)
+        XCTAssertEqual(clone.scoreCard.quartersSimulated, 99)
     }
 
     // MARK: - 6b. What-if previews keep the same shock path

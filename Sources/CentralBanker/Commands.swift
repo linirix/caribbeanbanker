@@ -292,6 +292,8 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
         simulator.applyFXIntervention(months: months)
         let newRate = simulator.state.exchangeRate
         let newReserves = simulator.state.foreignReservesMonths
+        let oldDisplayedRate = displayedExchangeRate(oldRate)
+        let newDisplayedRate = displayedExchangeRate(newRate)
         let fxDirection: String
         if newRate < oldRate - 0.0005 {
             fxDirection = "SLD strengthened"
@@ -303,12 +305,12 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
 
         if months > 0 {
             return String(
-                format: "Bought %.2f months of FX reserves and sold SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f SLD/USD (%@).",
+                format: "Bought %.2f months of FX reserves and sold SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f USD/SLD (%@).",
                 months,
                 oldReserves,
                 newReserves,
-                oldRate,
-                newRate,
+                oldDisplayedRate,
+                newDisplayedRate,
                 fxDirection
             )
         } else {
@@ -316,12 +318,12 @@ func applyCommand(_ cmd: Command, simulator: EconomicSimulator) -> String? {
                 ? " Temporary defense support has been added for the next quarter."
                 : ""
             return String(
-                format: "Sold %.2f months of FX reserves and bought SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f SLD/USD (%@).%@",
+                format: "Sold %.2f months of FX reserves and bought SLD. Reserves: %.2f -> %.2f mo. Rate: %.3f -> %.3f USD/SLD (%@).%@",
                 -months,
                 oldReserves,
                 newReserves,
-                oldRate,
-                newRate,
+                oldDisplayedRate,
+                newDisplayedRate,
                 fxDirection,
                 supportText
             )

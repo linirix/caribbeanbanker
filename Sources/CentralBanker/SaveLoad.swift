@@ -122,7 +122,14 @@ func readSave(from path: String? = nil) throws -> GameSave {
         throw SaveLoadError.versionMismatch(found: save.version,
                                             supported: "4...\(GameSave.currentVersion)")
     }
-    return save
+    return migrate(save)
+}
+
+private func migrate(_ save: GameSave) -> GameSave {
+    // Keep the migration hook in place even while all supported formats decode
+    // directly. When a future schema change needs a real transform, the call
+    // site is already centralized here instead of being spread across readers.
+    save
 }
 
 // Resolved save path (for display purposes — "Saved to /abs/path/..." msg).

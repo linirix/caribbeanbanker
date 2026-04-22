@@ -615,7 +615,9 @@ enum GameConfigs {
     }
 
     static func difficulty(_ difficulty: Difficulty) -> DifficultyConfig {
-        tuning.difficulties[difficulty.rawValue] ?? GameTuningConfig.fallback.difficulties[difficulty.rawValue]!
+        tuning.difficulties[difficulty.rawValue]
+            ?? requiredFallback(GameTuningConfig.fallback.difficulties[difficulty.rawValue],
+                                context: "difficulty '\(difficulty.rawValue)'")
     }
 
     static func lengthAdjustments(for gameLength: GameLength) -> LengthModelAdjustments? {
@@ -623,7 +625,9 @@ enum GameConfigs {
     }
 
     static func openingBaseline(for gameLength: GameLength) -> OpeningBaselineConfig {
-        tuning.opening.baselines[gameLength.rawValue] ?? GameTuningConfig.fallback.opening.baselines[gameLength.rawValue]!
+        tuning.opening.baselines[gameLength.rawValue]
+            ?? requiredFallback(GameTuningConfig.fallback.opening.baselines[gameLength.rawValue],
+                                context: "opening baseline '\(gameLength.rawValue)'")
     }
 
     static func openingHistoricalGrowth(for gameLength: GameLength) -> Double {
@@ -633,11 +637,15 @@ enum GameConfigs {
     }
 
     static func cabinetRequest(_ type: CabinetRequestType) -> CabinetRequestConfig {
-        tuning.cabinet.requests[type.rawValue] ?? GameTuningConfig.fallback.cabinet.requests[type.rawValue]!
+        tuning.cabinet.requests[type.rawValue]
+            ?? requiredFallback(GameTuningConfig.fallback.cabinet.requests[type.rawValue],
+                                context: "cabinet request '\(type.rawValue)'")
     }
 
     static func crisisMeasure(_ type: CrisisMeasureType) -> CrisisMeasureConfig {
-        tuning.crisis.measures[type.rawValue] ?? GameTuningConfig.fallback.crisis.measures[type.rawValue]!
+        tuning.crisis.measures[type.rawValue]
+            ?? requiredFallback(GameTuningConfig.fallback.crisis.measures[type.rawValue],
+                                context: "crisis measure '\(type.rawValue)'")
     }
 
     static func scenario(id: String) -> ScenarioConfig? {
@@ -658,6 +666,13 @@ enum GameConfigs {
             }
             .map(\.key)
     }
+}
+
+private func requiredFallback<T>(_ value: T?, context: String) -> T {
+    guard let value else {
+        preconditionFailure("Missing fallback config for \(context). Update GameTuningConfig.fallback to match the current enums.")
+    }
+    return value
 }
 
 extension EconomicSimulator {

@@ -648,9 +648,9 @@ func makeHelpSnapshot(gameLength: GameLength,
                         "This is your main crisis buffer."
                     ]),
                     HelpCommandDescriptor(command: "Exchange Rate", details: [
-                        "SLD per USD.",
-                        "A higher number means a weaker Solan Dollar.",
-                        "A lower number means a stronger Solan Dollar."
+                        "Displayed as USD per SLD.",
+                        "A higher number means a stronger Solan Dollar.",
+                        "A lower number means a weaker Solan Dollar."
                     ]),
                     HelpCommandDescriptor(command: "External Debt", details: [
                         "Stock of obligations owed abroad.",
@@ -931,11 +931,11 @@ private func buildDashboardSnapshot(simulator: EconomicSimulator,
                     left: MetricDescriptor(
                         id: "exchange-rate",
                         label: "Exch. Rate",
-                        primaryValue: String(format: "%.3f SLD/USD", s.exchangeRate),
-                        deltaText: percentText(s.exchangeRateQoQChange),
+                        primaryValue: String(format: "%.3f USD/SLD", displayedExchangeRate(s.exchangeRate)),
+                        deltaText: percentText(displayedExchangeRateQoQChange(s.exchangeRateQoQChange)),
                         trend: nil,
                         severity: exchangeRateSeverity(s.exchangeRateQoQChange),
-                        note: nil,
+                        note: "positive = stronger",
                         numericValue: s.exchangeRate,
                         displayStyle: .plain),
                     right: MetricDescriptor(
@@ -1510,8 +1510,8 @@ private func buildStatusSnapshot(simulator: EconomicSimulator,
         InfoSection(
             heading: "External Sector",
             rows: [
-                String(format: "Exchange Rate: %.4f SLD/USD", s.exchangeRate),
-                String(format: "Qtrly ER Change: %+.2f%% (+ = depreciation)", s.exchangeRateQoQChange * 100),
+                String(format: "Exchange Rate: %.4f USD/SLD", displayedExchangeRate(s.exchangeRate)),
+                String(format: "Qtrly ER Change: %+.2f%% (+ = strengthening)", displayedExchangeRateQoQChange(s.exchangeRateQoQChange) * 100),
                 String(format: "Current Account: %+.2f%% GDP", s.currentAccountGDP * 100),
                 String(format: "Capital Account: %+.2f%% GDP", s.capitalAccountGDP * 100),
                 String(format: "FX Reserves: %.2f months of imports", s.foreignReservesMonths),
@@ -1760,14 +1760,18 @@ private func comparisonDescriptor(id: String,
             note: nil
         )
     case .fx:
+        let displayedBefore = displayedExchangeRate(before)
+        let displayedAfter = displayedExchangeRate(after)
+        let displayedDelta = displayedAfter - displayedBefore
+        let displayedSeverity: SeverityLevel = abs(displayedDelta) < 1e-9 ? .neutral : (displayedDelta > 0 ? .good : .warning)
         return ComparisonDescriptor(
             id: id,
             label: label,
-            beforeValue: String(format: "%.3f", before),
-            afterValue: String(format: "%.3f", after),
-            deltaText: String(format: "%+.3f", delta),
-            severity: severity,
-            note: nil
+            beforeValue: String(format: "%.3f USD/SLD", displayedBefore),
+            afterValue: String(format: "%.3f USD/SLD", displayedAfter),
+            deltaText: String(format: "%+.3f", displayedDelta),
+            severity: displayedSeverity,
+            note: "positive = stronger SLD"
         )
     case .score:
         return ComparisonDescriptor(
@@ -1813,6 +1817,17 @@ private func percentagePointText(_ value: Double, allowZero: Bool) -> String? {
         return nil
     }
     return String(format: "%+.\(1)fpp", value * 100)
+}
+
+func displayedExchangeRate(_ internalRate: Double) -> Double {
+    guard internalRate > 0 else { return 0.0 }
+    return 1.0 / internalRate
+}
+
+func displayedExchangeRateQoQChange(_ internalQoQChange: Double) -> Double {
+    let denominator = 1.0 + internalQoQChange
+    guard denominator > 0 else { return 0.0 }
+    return (1.0 / denominator) - 1.0
 }
 
 private func trendDirection(_ history: [Double]) -> TrendDirection? {

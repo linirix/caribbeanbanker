@@ -619,6 +619,8 @@ class EconomicSimulator {
     // `what_if` so the player can see projected outcomes without consuming
     // the session's RNG stream or touching the real state.
     func cloneForPreview() -> EconomicSimulator {
+        // SessionLog and ScoreCard are value types, so this creates independent
+        // copies for preview work rather than aliasing the live simulator state.
         let c = EconomicSimulator(state: self.state,
                                   environment: self.environment,
                                   log: self.log,
