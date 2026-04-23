@@ -45,15 +45,19 @@ If your local toolchain is sensitive to non-SDK headers, the included helper use
 ```text
 Usage: CentralBanker [options]
   --seed <uint64>        Fix session seed for reproducible runs.
-  --mode <h|r>           Start in historical (h) or randomized (r) mode.
+  --mode <h|r>           Start in historical (h) or randomized (r) mode,
+                         skipping the menu.
   --length <s|e>         Use short (1973–1982) or extended (1960–2000) play.
-  --difficulty <a|g|v>   Apprentice / Governor / Volcker.
+  --difficulty <a|g|v>   Apprentice / Governor / Volcker,
+                         skipping the difficulty selector.
   --scenario <id>        Start a historical scenario by id.
   --balance              Run the headless balance harness instead of the game.
+  --validate-model       Run the expectation-based model-validation sweep.
   --runs <int>           Runs per balance cell (default: 100).
-  --bot <name>           passive, rate_only, or full_reactive.
-  --report <path>        Write balance results as JSON when running --balance.
-  --help                 Show usage.
+  --bot <name>           Limit balance harness to passive, rate_only, full_reactive,
+                         hawkish, balanced, dovish, or glonzo.
+  --report <path>        Write harness results as JSON when running --balance or --validate-model.
+  --help                 Show this message.
 ```
 
 Example:
@@ -139,6 +143,7 @@ Examples:
 swift run CentralBanker --balance --runs 100
 swift run CentralBanker --balance --mode h --length s --difficulty g --bot passive --runs 50
 swift run CentralBanker --balance --mode r --length e --difficulty v --bot full_reactive --runs 60 --report /tmp/balance.json
+swift run CentralBanker --validate-model --runs 100 --report /tmp/model-validation.json
 ```
 
 This is the primary tool for balancing:
@@ -148,6 +153,7 @@ This is the primary tool for balancing:
 - policy action frequency
 - crisis-tool usage
 - difficulty separation
+- common-sense model validation across curated stress profiles
 
 ## Config and Tuning
 
@@ -171,7 +177,9 @@ Broken config files are intentionally loud on stderr; the game falls back to com
 ## Project Structure
 
 - [Sources/CentralBanker](Sources/CentralBanker)
-  - core model, session lifecycle, display, command parsing, scenarios, tuning, harness
+  - core model, session lifecycle, forecasting, scoring, scenarios, tuning, saves, and shared presentation snapshots
+- [Sources/CentralBankerTerminal](Sources/CentralBankerTerminal)
+  - terminal renderer, command parsing, interactive shell, and headless harness
 - [Sources/CentralBankerApp](Sources/CentralBankerApp)
   - thin executable entrypoint
 - [Tests/CentralBankerTests](Tests/CentralBankerTests)
@@ -181,9 +189,10 @@ Important files:
 
 - [GameSession.swift](Sources/CentralBanker/GameSession.swift)
 - [Economy.swift](Sources/CentralBanker/Economy.swift)
-- [Display.swift](Sources/CentralBanker/Display.swift)
+- [Presentation.swift](Sources/CentralBanker/Presentation.swift)
 - [GameConfig.swift](Sources/CentralBanker/GameConfig.swift)
-- [BalanceHarness.swift](Sources/CentralBanker/BalanceHarness.swift)
+- [Display.swift](Sources/CentralBankerTerminal/Display.swift)
+- [BalanceHarness.swift](Sources/CentralBankerTerminal/BalanceHarness.swift)
 
 ## Development
 
