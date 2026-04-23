@@ -1293,6 +1293,101 @@ final class EconomyTests: XCTestCase {
                           "Oil shock should also depress the output gap.")
     }
 
+    func testDebriefShockAttributionStaysAlignedWithSimulatorEffects() {
+        func quietSimulator() -> EconomicSimulator {
+            var params = ModelParameters.default
+            params.outputGap.demandNoiseStd = 0.0
+            params.inflation.supplyNoiseStd = 0.0
+
+            let sim = EconomicSimulator(params: params, seed: testSeed)
+            sim.state.inflation = 0.055
+            sim.state.expectedInflation = 0.055
+            sim.state.coreInflation = 0.055
+            sim.state.outputGap = 0.0
+            sim.state.gdpGrowthQoQ = 0.0
+            sim.state.currentAccountGDP = 0.0
+            sim.state.capitalAccountGDP = 0.0
+            sim.state.exchangeRateQoQChange = 0.0
+            sim.state.reserveRequirement = 0.12
+            sim.state.capitalControls = 0.0
+            sim.state.bankCreditGrowth = params.money.baseCreditGrowth
+            return sim
+        }
+
+        let inflationCases: [EconomicEvent] = [
+            EconomicEvent(type: .oilShock(magnitude: 1.5), isScripted: true),
+            EconomicEvent(type: .oilRecovery(magnitude: 0.4), isScripted: true),
+            EconomicEvent(type: .droughtOrDisaster, isScripted: true),
+            EconomicEvent(type: .workerStrike, isScripted: true)
+        ]
+
+        for event in inflationCases {
+            let sim = quietSimulator()
+            let report = sim.simulateQuarter(events: [event])
+            let p = sim.params
+            let demandContribution = p.inflation.phillipsSlope * report.stateAfter.outputGap
+            let fxContribution = p.inflation.exchangeRatePassthrough * report.stateBefore.exchangeRateQoQChange
+            let shockContribution = approximateEventInflationContribution(report.events)
+            let residual = report.stateAfter.inflation
+                - report.stateBefore.expectedInflation
+                - demandContribution
+                - fxContribution
+                - shockContribution
+
+            XCTAssertEqual(
+                residual,
+                0.0,
+                accuracy: 1e-9,
+                "Inflation debrief attribution drifted for \(event.type)."
+            )
+        }
+
+        let demandCases: [EconomicEvent] = [
+            EconomicEvent(type: .oilShock(magnitude: 1.5), isScripted: true),
+            EconomicEvent(type: .oilRecovery(magnitude: 0.4), isScripted: true),
+            EconomicEvent(type: .droughtOrDisaster, isScripted: true),
+            EconomicEvent(type: .workerStrike, isScripted: true),
+            EconomicEvent(type: .creditCrunch, isScripted: true)
+        ]
+
+        for event in demandCases {
+            let sim = quietSimulator()
+            let report = sim.simulateQuarter(events: [event])
+            let p = sim.params
+            let before = report.stateBefore
+            let after = report.stateAfter
+            let reserveOverhang = max(0.0, before.reserveRequirement - p.outputGap.reserveRequirementDragThreshold)
+            let controlsOverhang = max(0.0, before.capitalControls - p.outputGap.capitalControlsDragThreshold)
+            let realRateGap = before.realInterestRate - p.outputGap.neutralRealRate
+            let rateContribution = -(p.outputGap.isCoefficient / 4.0) * realRateGap
+            let reserveContribution = -p.outputGap.reserveRequirementDemandDrag * reserveOverhang
+            let controlsContribution = -p.outputGap.capitalControlsDemandDrag * controlsOverhang
+            let creditContribution = p.outputGap.creditImpulse * (after.bankCreditGrowth - p.outputGap.creditBaseline)
+            let externalDemandContribution = p.outputGap.externalDemand
+                * (report.environmentAfter.tradingPartnerGrowth / 4.0 - p.outputGap.partnerQuarterlyBaseline)
+            let currentAccountContribution = p.outputGap.currentAccountSupport * before.currentAccountGDP
+            let shockContribution = approximateEventOutputGapContribution(report.events, params: p)
+            let residual = after.outputGap
+                - (
+                    p.outputGap.persistence * before.outputGap
+                    + rateContribution
+                    + reserveContribution
+                    + controlsContribution
+                    + creditContribution
+                    + externalDemandContribution
+                    + currentAccountContribution
+                    + shockContribution
+                )
+
+            XCTAssertEqual(
+                residual,
+                0.0,
+                accuracy: 1e-9,
+                "Demand debrief attribution drifted for \(event.type)."
+            )
+        }
+    }
+
     func testLaggedDepreciationRaisesInflationRelativeToBaseline() {
         let calm = EconomicSimulator(seed: testSeed)
         let weakCurrency = EconomicSimulator(seed: testSeed)
@@ -1881,6 +1976,67 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(reloaded.state.foreignReservesMonths, original.state.foreignReservesMonths, accuracy: 1e-12)
         XCTAssertEqual(reloaded.state.publicApproval, original.state.publicApproval, accuracy: 1e-12)
         XCTAssertEqual(reloaded.state.politicalPressure, original.state.politicalPressure, accuracy: 1e-12)
+    }
+
+    func testReadSaveMigratesAndLoadsVersion4Payload() throws {
+        let savePath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("centralbanker-v4-\(UUID().uuidString).json")
+
+        let simulator = EconomicSimulator(seed: testSeed)
+        simulator.state.year = 1979
+        simulator.state.quarter = 3
+        simulator.communicationStance = .hawkish
+        simulator.activeCabinetRequest = CabinetRequest(
+            type: .defendCurrency,
+            detail: "Cabinet wants visible reserve defense before confidence slips further."
+        )
+        simulator.demandNoiseCarry = 0.012
+        simulator.supplyNoiseCarry = -0.004
+
+        let v4Save = GameSave(
+            version: 4,
+            state: simulator.state,
+            environment: simulator.environment,
+            log: simulator.log,
+            scoreCard: simulator.scoreCard,
+            difficulty: .governor,
+            communicationStance: simulator.communicationStance,
+            activeCabinetRequest: simulator.activeCabinetRequest,
+            rng: simulator.rng,
+            demandNoiseCarry: simulator.demandNoiseCarry,
+            supplyNoiseCarry: simulator.supplyNoiseCarry,
+            interventionSupportCarry: nil,
+            controlsReliefCarry: nil,
+            crisisCooldownQuarters: nil,
+            sessionSeed: testSeed,
+            mode: .historical,
+            gameLength: nil,
+            scenarioID: nil,
+            macroSchedule: [:],
+            rateSchedule: [:]
+        )
+
+        defer { try? FileManager.default.removeItem(at: savePath) }
+        let encoded = try JSONEncoder().encode(v4Save)
+        try encoded.write(to: savePath)
+
+        let loaded = try readSave(from: savePath.path)
+        XCTAssertEqual(loaded.version, 4)
+        XCTAssertNil(loaded.gameLength)
+        XCTAssertNil(loaded.interventionSupportCarry)
+        XCTAssertNil(loaded.controlsReliefCarry)
+        XCTAssertNil(loaded.crisisCooldownQuarters)
+        XCTAssertEqual(loaded.communicationStance, .hawkish)
+        XCTAssertEqual(loaded.activeCabinetRequest?.type, .defendCurrency)
+
+        let session = GameSession(save: loaded)
+        XCTAssertEqual(session.gameLength, .short)
+        XCTAssertEqual(session.mode, .historical)
+        XCTAssertEqual(session.simulator.communicationStance, .hawkish)
+        XCTAssertEqual(session.simulator.activeCabinetRequest?.type, .defendCurrency)
+        XCTAssertEqual(session.simulator.interventionSupportCarry, 0.0, accuracy: 1e-12)
+        XCTAssertEqual(session.simulator.controlsReliefCarry, 0.0, accuracy: 1e-12)
+        XCTAssertEqual(session.simulator.crisisCooldownQuarters, 0)
     }
 
     // MARK: - 8. Heavy capital controls carry political and credibility cost

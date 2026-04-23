@@ -14,6 +14,8 @@ import Foundation
 package struct QuarterReport {
     package let stateBefore: EconomicState
     package let stateAfter: EconomicState
+    package let environmentBefore: ExternalEnvironment
+    package let environmentAfter: ExternalEnvironment
     package let events: [EconomicEvent]
     // News items generated this quarter, in emission order:
     // event descriptions first, then reserve alarms, then macro commentary.

@@ -2043,8 +2043,10 @@ private func outputGapAttributionRows(params: ModelParameters,
     let reserveContribution = -params.outputGap.reserveRequirementDemandDrag * reserveOverhang
     let controlsContribution = -params.outputGap.capitalControlsDemandDrag * controlsOverhang
     let creditContribution = params.outputGap.creditImpulse * (after.bankCreditGrowth - params.outputGap.creditBaseline)
+    let externalDemandContribution = params.outputGap.externalDemand
+        * (report.environmentAfter.tradingPartnerGrowth / 4.0 - params.outputGap.partnerQuarterlyBaseline)
     let currentAccountContribution = params.outputGap.currentAccountSupport * before.currentAccountGDP
-    let directShockContribution = approximateEventOutputGapContribution(report.events)
+    let directShockContribution = approximateEventOutputGapContribution(report.events, params: params)
     let residualNoise = after.outputGap
         - (
             params.outputGap.persistence * before.outputGap
@@ -2052,13 +2054,14 @@ private func outputGapAttributionRows(params: ModelParameters,
             + reserveContribution
             + controlsContribution
             + creditContribution
+            + externalDemandContribution
             + currentAccountContribution
             + directShockContribution
         )
 
     return [
         "Demand channel: rates contributed \(ppText(rateContribution)); reserve requirements \(ppText(reserveContribution)); capital controls \(ppText(controlsContribution)).",
-        "Offsetting support: bank-credit impulse \(ppText(creditContribution)); current-account carry \(ppText(currentAccountContribution)).",
+        "Offsetting support: bank-credit impulse \(ppText(creditContribution)); external demand \(ppText(externalDemandContribution)); current-account carry \(ppText(currentAccountContribution)).",
         "Residual demand noise and timing effects came in at \(ppText(residualNoise))."
     ]
 }
@@ -2070,7 +2073,7 @@ private func inflationShockRows(params: ModelParameters,
                                 eventHeadlines: [String],
                                 previewMode: Bool) -> [String] {
     let demandContribution = params.inflation.phillipsSlope * after.outputGap
-    let fxContribution = params.inflation.exchangeRatePassthrough * after.exchangeRateQoQChange
+    let fxContribution = params.inflation.exchangeRatePassthrough * before.exchangeRateQoQChange
     let shockContribution = approximateEventInflationContribution(report.events)
     let residualNoise = after.inflation - before.expectedInflation - demandContribution - fxContribution - shockContribution
 
@@ -2078,7 +2081,7 @@ private func inflationShockRows(params: ModelParameters,
     if eventHeadlines.isEmpty {
         rows.append("No named supply shock \(previewMode ? "is expected" : "hit") this quarter; the main non-policy inflation drivers were FX passthrough and residual supply noise.")
     } else {
-        rows.append("Named shocks \(previewMode ? "are expected to add" : "added") roughly \(ppText(shockContribution)) to inflation and \(ppText(approximateEventOutputGapContribution(report.events))) to demand.")
+        rows.append("Named shocks \(previewMode ? "are expected to add" : "added") roughly \(ppText(shockContribution)) to inflation and \(ppText(approximateEventOutputGapContribution(report.events, params: params))) to demand.")
     }
     rows.append("Inflation impulse beyond expectations: Phillips demand \(ppText(demandContribution)); FX passthrough \(ppText(fxContribution)); residual supply noise \(ppText(residualNoise)).")
     return rows
@@ -2115,7 +2118,7 @@ private func expectationUpdateRow(params: ModelParameters,
     return "Adaptive expectations alone would have moved expectations to \(percentText(preCommunication)) at a speed of \(String(format: "%.0f%%", adaptSpeed * 100)); communication \(phase) shift that path by \(ppText(communicationContribution))."
 }
 
-private func approximateEventInflationContribution(_ events: [EconomicEvent]) -> Double {
+func approximateEventInflationContribution(_ events: [EconomicEvent]) -> Double {
     events.reduce(0.0) { partial, event in
         switch event.type {
         case .oilShock(let magnitude):
@@ -2132,21 +2135,21 @@ private func approximateEventInflationContribution(_ events: [EconomicEvent]) ->
     }
 }
 
-private func approximateEventOutputGapContribution(_ events: [EconomicEvent]) -> Double {
+func approximateEventOutputGapContribution(_ events: [EconomicEvent], params: ModelParameters) -> Double {
     events.reduce(0.0) { partial, event in
         switch event.type {
         case .oilShock(let magnitude):
-            return partial - 0.012 * magnitude
+            return partial - params.outputGap.persistence * 0.012 * magnitude
         case .droughtOrDisaster:
-            return partial - 0.014
+            return partial - params.outputGap.persistence * 0.014
         case .tourismBoom:
-            return partial + 0.005
+            return partial + params.outputGap.persistence * 0.005
         case .tourismCollapse:
-            return partial - 0.008
+            return partial - params.outputGap.persistence * 0.008
         case .workerStrike:
-            return partial - 0.012
+            return partial - params.outputGap.persistence * 0.012
         case .creditCrunch:
-            return partial - 0.007
+            return partial - params.outputGap.persistence * 0.007
         default:
             return partial
         }
@@ -2292,6 +2295,8 @@ private func syntheticQuarterReport(from simulator: EconomicSimulator,
     return QuarterReport(
         stateBefore: before,
         stateAfter: after,
+        environmentBefore: simulator.environment,
+        environmentAfter: simulator.environment,
         events: [],
         news: news
     )

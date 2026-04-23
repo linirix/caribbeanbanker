@@ -126,6 +126,7 @@ package class EconomicSimulator {
     @discardableResult
     package func simulateQuarter(events: [EconomicEvent]) -> QuarterReport {
         let stateBefore = state
+        let environmentBefore = environment
         var s = state
         var env = environment
 
@@ -389,6 +390,8 @@ package class EconomicSimulator {
         return QuarterReport(
             stateBefore: stateBefore,
             stateAfter: state,
+            environmentBefore: environmentBefore,
+            environmentAfter: environment,
             events: events,
             news: news
         )
