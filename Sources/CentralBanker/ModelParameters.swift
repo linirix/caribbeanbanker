@@ -222,7 +222,7 @@ struct ModelParameters {
 // Small helper so the simulator can write `bounds.clamping(x)` instead of
 // the nested max/min calls that cluttered the previous version.
 extension ClosedRange where Bound == Double {
-    func clamping(_ v: Double) -> Double {
+    package func clamping(_ v: Double) -> Double {
         Swift.min(upperBound, Swift.max(lowerBound, v))
     }
 }

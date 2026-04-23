@@ -12,11 +12,11 @@ import Foundation
 //   • future save/load can serialise environment state independently;
 //   • tests can stub in an `ExternalEnvironment` to replay a specific path
 //     without reconstructing a whole economic state.
-struct ExternalEnvironment: Codable {
-    var worldInterestRate: Double = 0.060
-    var worldInflation: Double = 0.055
-    var tradingPartnerGrowth: Double = 0.035
-    var oilPriceIndex: Double = 100.0
-    var commodityPriceIndex: Double = 100.0
-    var termsOfTrade: Double = 1.0
+package struct ExternalEnvironment: Codable {
+    package var worldInterestRate: Double = 0.060
+    package var worldInflation: Double = 0.055
+    package var tradingPartnerGrowth: Double = 0.035
+    package var oilPriceIndex: Double = 100.0
+    package var commodityPriceIndex: Double = 100.0
+    package var termsOfTrade: Double = 1.0
 }

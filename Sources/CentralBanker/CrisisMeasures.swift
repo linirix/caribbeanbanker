@@ -1,11 +1,11 @@
 import Foundation
 
-enum CrisisMeasureType: String, Codable, CaseIterable {
+package enum CrisisMeasureType: String, Codable, CaseIterable {
     case imfProgram
     case bankHoliday
     case emergencyLiquidity
 
-    var title: String {
+    package var title: String {
         switch self {
         case .imfProgram:
             return "IMF Program"
@@ -16,7 +16,7 @@ enum CrisisMeasureType: String, Codable, CaseIterable {
         }
     }
 
-    var commandName: String {
+    package var commandName: String {
         switch self {
         case .imfProgram:
             return "imf"
@@ -28,16 +28,16 @@ enum CrisisMeasureType: String, Codable, CaseIterable {
     }
 }
 
-struct CrisisMeasure: Equatable {
-    let type: CrisisMeasureType
-    let detail: String
-    let tradeoff: String
+package struct CrisisMeasure: Equatable {
+    package let type: CrisisMeasureType
+    package let detail: String
+    package let tradeoff: String
 }
 
 extension EconomicSimulator {
-    var crisisMeasureCooldown: Int { GameConfigs.tuning.crisis.cooldownQuarters }
+    package var crisisMeasureCooldown: Int { GameConfigs.tuning.crisis.cooldownQuarters }
 
-    func availableCrisisMeasures() -> [CrisisMeasure] {
+    package func availableCrisisMeasures() -> [CrisisMeasure] {
         guard crisisCooldownQuarters == 0 else { return [] }
 
         return CrisisMeasureType.allCases.compactMap { type in
@@ -47,14 +47,14 @@ extension EconomicSimulator {
         }
     }
 
-    func crisisStatusText() -> String {
+    package func crisisStatusText() -> String {
         if crisisCooldownQuarters > 0 {
             return "COOLDOWN \(crisisCooldownQuarters)Q"
         }
         return availableCrisisMeasures().isEmpty ? "NONE" : "AVAILABLE"
     }
 
-    func describeCrisisMeasures() -> String {
+    package func describeCrisisMeasures() -> String {
         if crisisCooldownQuarters > 0 {
             return "Crisis tools are cooling down for \(crisisCooldownQuarters) more quarters."
         }
@@ -69,7 +69,7 @@ extension EconomicSimulator {
         }.joined(separator: "  |  ")
     }
 
-    func enactCrisisMeasure(_ type: CrisisMeasureType) -> String {
+    package func enactCrisisMeasure(_ type: CrisisMeasureType) -> String {
         if crisisCooldownQuarters > 0 {
             return "Crisis measures unavailable for \(crisisCooldownQuarters) more quarters."
         }

@@ -1,4 +1,5 @@
 import Foundation
+import CentralBankerCore
 
 // Pure, testable CLI argument parsing. This used to live in `TerminalApp.swift`
 // with embedded `print` / `exit` / `FileHandle.standardError` calls, which

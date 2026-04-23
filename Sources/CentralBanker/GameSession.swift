@@ -1,45 +1,45 @@
 import Foundation
 
-struct ForecastReviewRecord {
-    let estimate: ForecastEstimate
-    let note: String?
-    let baselineEstimate: ForecastEstimate?
+package struct ForecastReviewRecord {
+    package let estimate: ForecastEstimate
+    package let note: String?
+    package let baselineEstimate: ForecastEstimate?
 }
 
-final class GameSession {
-    private(set) var mode: GameMode
-    private(set) var gameLength: GameLength
-    private(set) var scenarioID: String?
-    private(set) var difficulty: Difficulty
-    private(set) var sessionSeed: UInt64
-    private(set) var simulator: EconomicSimulator
+package final class GameSession {
+    package private(set) var mode: GameMode
+    package private(set) var gameLength: GameLength
+    package private(set) var scenarioID: String?
+    package private(set) var difficulty: Difficulty
+    package private(set) var sessionSeed: UInt64
+    package private(set) var simulator: EconomicSimulator
     private(set) var macroSchedule: [Int: [EventType]]
     private(set) var rateSchedule: [Int: Double]
     private(set) var lastQuarterReport: QuarterReport? = nil
     private(set) var lastForecastReview: ForecastReviewRecord? = nil
     private(set) var pendingPreviewReview: ForecastReviewRecord? = nil
 
-    var scenario: ScenarioDefinition? {
+    package var scenario: ScenarioDefinition? {
         scenarioDefinition(id: scenarioID)
     }
 
-    var campaignTitle: String {
+    package var campaignTitle: String {
         campaignDisplayTitle(gameLength: gameLength, scenarioID: scenarioID)
     }
 
-    var campaignRange: String {
+    package var campaignRange: String {
         campaignRangeLabel(gameLength: gameLength, scenarioID: scenarioID)
     }
 
-    var totalCampaignQuarters: Int {
+    package var totalCampaignQuarters: Int {
         scenarioDefinition(id: scenarioID)?.totalQuarters ?? gameLength.totalQuarters
     }
 
-    init(mode: GameMode,
-         gameLength: GameLength,
-         difficulty: Difficulty,
-         scenarioID: String? = nil,
-         sessionSeed: UInt64) {
+    package init(mode: GameMode,
+                 gameLength: GameLength,
+                 difficulty: Difficulty,
+                 scenarioID: String? = nil,
+                 sessionSeed: UInt64) {
         let resolvedScenario = scenarioDefinition(id: scenarioID)
         let resolvedMode: GameMode = resolvedScenario == nil ? mode : .historical
         let resolvedGameLength = resolvedScenario?.gameLength ?? gameLength
@@ -102,7 +102,7 @@ final class GameSession {
         self.rateSchedule = save.rateSchedule
     }
 
-    static func load(from path: String? = nil) throws -> GameSession {
+    package static func load(from path: String? = nil) throws -> GameSession {
         try GameSession(save: readSave(from: path))
     }
 
@@ -129,15 +129,15 @@ final class GameSession {
             rateSchedule: rateSchedule)
     }
 
-    func save(to path: String? = nil) throws {
+    package func save(to path: String? = nil) throws {
         try writeSave(makeSave(), to: path)
     }
 
-    func loadDescription() -> String {
+    package func loadDescription() -> String {
         "\(mode == .historical ? "historical" : "randomized"), \(campaignTitle.lowercased()), \(difficulty.displayName)"
     }
 
-    func currentOutcome() -> GameOutcome {
+    package func currentOutcome() -> GameOutcome {
         let outcome = simulator.checkOutcome()
         if outcome == .ongoing
             && isCampaignComplete(state: simulator.state, gameLength: gameLength, scenarioID: scenarioID) {
@@ -147,7 +147,7 @@ final class GameSession {
     }
 
     @discardableResult
-    func advance() -> GameOutcome {
+    package func advance() -> GameOutcome {
         let quarterBeingAdvanced = simulator.state.quarterLabel
         let matchingForecast = pendingPreviewReview?.estimate.report.stateBefore.quarterLabel == quarterBeingAdvanced
             ? pendingPreviewReview

@@ -1,11 +1,11 @@
 import Foundation
 
-enum GameMode: Codable {
+package enum GameMode: Codable {
     case historical
     case randomized
 }
 
-enum EventType: Codable {
+package enum EventType: Codable {
     case oilShock(magnitude: Double)         // magnitude = fractional price increase
     case oilRecovery(magnitude: Double)
     case tradingPartnerRecession(severity: Double)
@@ -25,9 +25,9 @@ enum EventType: Codable {
     case foreignAid
 }
 
-struct EconomicEvent {
-    let type: EventType
-    let isScripted: Bool
+package struct EconomicEvent {
+    package let type: EventType
+    package let isScripted: Bool
 }
 
 // ─── Historical track ────────────────────────────────────────────────────────
@@ -73,10 +73,10 @@ func scheduleMacroEvents(for gameLength: GameLength,
 
 // ─── World interest rate ──────────────────────────────────────────────────────
 
-func worldInterestRate(for state: EconomicState,
-                       mode: GameMode,
-                       gameLength: GameLength = .short,
-                       rateSchedule: [Int: Double]) -> Double {
+package func worldInterestRate(for state: EconomicState,
+                               mode: GameMode,
+                               gameLength: GameLength = .short,
+                               rateSchedule: [Int: Double]) -> Double {
     switch mode {
     case .historical:
         return GameConfigs.historicalTrack(for: gameLength).worldRate(for: state.year)

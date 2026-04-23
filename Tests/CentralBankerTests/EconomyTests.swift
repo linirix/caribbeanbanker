@@ -1,5 +1,9 @@
 import XCTest
 @testable import CentralBankerCore
+@testable import CentralBankerTerminal
+#if canImport(Darwin)
+import Darwin
+#endif
 
 // Five "golden path" tests that pin down core sim dynamics. They are not
 // exhaustive — they exist so that a parameter-tuning pass (e.g. changing
@@ -43,6 +47,19 @@ final class EconomyTests: XCTestCase {
                 file: file,
                 line: line)
         }
+    }
+
+    private func withTerminalColumns<T>(_ columns: Int, _ body: () throws -> T) rethrows -> T {
+        let previous = ProcessInfo.processInfo.environment["COLUMNS"]
+        setenv("COLUMNS", String(columns), 1)
+        defer {
+            if let previous {
+                setenv("COLUMNS", previous, 1)
+            } else {
+                unsetenv("COLUMNS")
+            }
+        }
+        return try body()
     }
 
     // MARK: - 1. Determinism
@@ -603,6 +620,33 @@ final class EconomyTests: XCTestCase {
         let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
         assertRenderedScreenFits(rendered)
         XCTAssertTrue(rendered.contains("FX Reserves:"))
+    }
+
+    func testRenderedDashboardStacksOnNarrowTerminalWidth() {
+        withTerminalColumns(84) {
+            let sim = EconomicSimulator(seed: testSeed)
+            sim.state.foreignReservesMonths = 1.2
+            sim.state.exchangeRateQoQChange = 0.06
+            sim.state.politicalPressure = 71
+            sim.log.addNews("SPECULATIVE ATTACK: Markets are probing the peg.", quarterLabel: sim.state.quarterLabel)
+
+            let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
+
+            assertRenderedScreenFits(rendered)
+            XCTAssertFalse(rendered.contains("│"))
+            XCTAssertTrue(rendered.contains("MONETARY CONDITIONS"))
+            XCTAssertTrue(rendered.contains("EXTERNAL SECTOR"))
+        }
+    }
+
+    func testRenderedDashboardKeepsSplitLayoutWhenWide() {
+        withTerminalColumns(96) {
+            let sim = EconomicSimulator(seed: testSeed)
+            let rendered = renderDashboard(makeDashboardSnapshot(simulator: sim))
+
+            assertRenderedScreenFits(rendered)
+            XCTAssertTrue(rendered.contains("│"))
+        }
     }
 
     func testRenderedHelpFitsFrameAndRetainsSections() {

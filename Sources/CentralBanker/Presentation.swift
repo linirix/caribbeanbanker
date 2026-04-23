@@ -47,33 +47,33 @@ package enum MetricDisplayStyle {
 }
 
 package struct ActionDescriptor {
-    let id: String
-    let label: String
-    let argumentHint: String?
-    let availability: ActionAvailability
-    let reasonIfUnavailable: String?
-    let group: ActionGroup
+    package let id: String
+    package let label: String
+    package let argumentHint: String?
+    package let availability: ActionAvailability
+    package let reasonIfUnavailable: String?
+    package let group: ActionGroup
 }
 
 package struct MetricDescriptor {
-    let id: String
-    let label: String
-    let primaryValue: String
-    let deltaText: String?
-    let trend: TrendDirection?
-    let severity: SeverityLevel
-    let note: String?
-    let numericValue: Double?
-    let displayStyle: MetricDisplayStyle
+    package let id: String
+    package let label: String
+    package let primaryValue: String
+    package let deltaText: String?
+    package let trend: TrendDirection?
+    package let severity: SeverityLevel
+    package let note: String?
+    package let numericValue: Double?
+    package let displayStyle: MetricDisplayStyle
 }
 
 package struct InfoSection {
-    let heading: String
-    let rows: [String]
-    let bullets: [String]
-    let emphasis: String?
+    package let heading: String
+    package let rows: [String]
+    package let bullets: [String]
+    package let emphasis: String?
 
-    init(heading: String, rows: [String] = [], bullets: [String] = [], emphasis: String? = nil) {
+    package init(heading: String, rows: [String] = [], bullets: [String] = [], emphasis: String? = nil) {
         self.heading = heading
         self.rows = rows
         self.bullets = bullets
@@ -82,208 +82,208 @@ package struct InfoSection {
 }
 
 package struct GamePresentationSnapshot {
-    let campaignTitle: String
-    let campaignRange: String
-    let quarterLabel: String
-    let difficultyLabel: String
-    let scenarioTitle: String?
-    let scenarioSummary: String?
-    let totalCampaignQuarters: Int
+    package let campaignTitle: String
+    package let campaignRange: String
+    package let quarterLabel: String
+    package let difficultyLabel: String
+    package let scenarioTitle: String?
+    package let scenarioSummary: String?
+    package let totalCampaignQuarters: Int
 }
 
 package struct MetricRowDescriptor {
-    let left: MetricDescriptor?
-    let right: MetricDescriptor?
+    package let left: MetricDescriptor?
+    package let right: MetricDescriptor?
 }
 
 package struct DashboardMetricSection {
-    let leftHeading: String
-    let rightHeading: String
-    let rows: [MetricRowDescriptor]
+    package let leftHeading: String
+    package let rightHeading: String
+    package let rows: [MetricRowDescriptor]
 }
 
 package struct ActionSectionDescriptor {
-    let group: ActionGroup
-    let title: String
-    let actions: [ActionDescriptor]
+    package let group: ActionGroup
+    package let title: String
+    package let actions: [ActionDescriptor]
 }
 
 package struct DashboardSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let subtitle: String
-    let metricSections: [DashboardMetricSection]
-    let advisorySections: [InfoSection]
-    let recentNews: [String]
-    let actionSections: [ActionSectionDescriptor]
-    let footerLegend: String
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let subtitle: String
+    package let metricSections: [DashboardMetricSection]
+    package let advisorySections: [InfoSection]
+    package let recentNews: [String]
+    package let actionSections: [ActionSectionDescriptor]
+    package let footerLegend: String
 }
 
 package struct ComparisonDescriptor {
-    let id: String
-    let label: String
-    let beforeValue: String
-    let afterValue: String
-    let deltaText: String
-    let severity: SeverityLevel
-    let note: String?
+    package let id: String
+    package let label: String
+    package let beforeValue: String
+    package let afterValue: String
+    package let deltaText: String
+    package let severity: SeverityLevel
+    package let note: String?
 }
 
 package struct PreviewSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let subtitle: String
-    let headerNote: String?
-    let explanation: String
-    let eventHeadlines: [String]
-    let projections: [ComparisonDescriptor]
-    let analysisSections: [InfoSection]
-    let footerNote: String
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let subtitle: String
+    package let headerNote: String?
+    package let explanation: String
+    package let eventHeadlines: [String]
+    package let projections: [ComparisonDescriptor]
+    package let analysisSections: [InfoSection]
+    package let footerNote: String
 }
 
 package struct AdvisorSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let requestedFocusLine: String?
-    let urgentSection: InfoSection
-    let rateSection: InfoSection
-    let recommendationSection: InfoSection
-    let watchSection: InfoSection
-    let topicSuggestions: [String]
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let requestedFocusLine: String?
+    package let urgentSection: InfoSection
+    package let rateSection: InfoSection
+    package let recommendationSection: InfoSection
+    package let watchSection: InfoSection
+    package let topicSuggestions: [String]
 }
 
 package struct ScenarioGoalDescriptor {
-    let description: String
-    let met: Bool
+    package let description: String
+    package let met: Bool
 }
 
 package struct ScenarioAssessmentSnapshot {
-    let heading: String
-    let severity: SeverityLevel
-    let overview: String
-    let focus: [String]
-    let missedObjectives: [String]
+    package let heading: String
+    package let severity: SeverityLevel
+    package let overview: String
+    package let focus: [String]
+    package let missedObjectives: [String]
 }
 
 package struct RecentQuarterSnapshot {
-    let quarterLabel: String
-    let inflation: String
-    let growth: String
-    let unemployment: String
-    let reserves: String
-    let rate: String
-    let pressure: String
+    package let quarterLabel: String
+    package let inflation: String
+    package let growth: String
+    package let unemployment: String
+    package let reserves: String
+    package let rate: String
+    package let pressure: String
 }
 
 package struct ReportSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let summarySection: InfoSection
-    let averages: [MetricDescriptor]
-    let extremes: [MetricDescriptor]
-    let recentQuarters: [RecentQuarterSnapshot]
-    let scenarioGoals: [ScenarioGoalDescriptor]
-    let scenarioAssessment: ScenarioAssessmentSnapshot?
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let summarySection: InfoSection
+    package let averages: [MetricDescriptor]
+    package let extremes: [MetricDescriptor]
+    package let recentQuarters: [RecentQuarterSnapshot]
+    package let scenarioGoals: [ScenarioGoalDescriptor]
+    package let scenarioAssessment: ScenarioAssessmentSnapshot?
 }
 
 package struct DebriefSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let summaryRows: [String]
-    let mainMoves: [MetricDescriptor]
-    let analysisSections: [InfoSection]
-    let interpretations: [String]
-    let headlines: [String]
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let summaryRows: [String]
+    package let mainMoves: [MetricDescriptor]
+    package let analysisSections: [InfoSection]
+    package let interpretations: [String]
+    package let headlines: [String]
 }
 
 package struct TutorialSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let stageTitle: String
-    let focus: [String]
-    let experiments: [String]
-    let success: [String]
-    let scenarioGoals: [ScenarioGoalDescriptor]
-    let companionActions: [ActionDescriptor]
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let stageTitle: String
+    package let focus: [String]
+    package let experiments: [String]
+    package let success: [String]
+    package let scenarioGoals: [ScenarioGoalDescriptor]
+    package let companionActions: [ActionDescriptor]
 }
 
 package struct ScenarioBriefingSnapshot {
-    let title: String
-    let rangeLabel: String
-    let briefing: String
-    let teachingFocus: [String]
-    let objectives: [String]
+    package let title: String
+    package let rangeLabel: String
+    package let briefing: String
+    package let teachingFocus: [String]
+    package let objectives: [String]
 }
 
 package struct HistoryChartSnapshot {
-    let label: String
-    let values: [Double]
-    let scale: Double
-    let latestValue: String
-    let goodRange: Range<Double>
-    let warningRange: Range<Double>
-    let positiveThreshold: Double?
+    package let label: String
+    package let values: [Double]
+    package let scale: Double
+    package let latestValue: String
+    package let goodRange: Range<Double>
+    package let warningRange: Range<Double>
+    package let positiveThreshold: Double?
 }
 
 package struct HistorySnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let charts: [HistoryChartSnapshot]
-    let recentQuarters: [RecentQuarterSnapshot]
-    let emptyState: String?
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let charts: [HistoryChartSnapshot]
+    package let recentQuarters: [RecentQuarterSnapshot]
+    package let emptyState: String?
 }
 
 package struct NewsSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let entries: [String]
-    let emptyState: String?
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let entries: [String]
+    package let emptyState: String?
 }
 
 package struct HelpCommandDescriptor {
-    let command: String
-    let details: [String]
+    package let command: String
+    package let details: [String]
 }
 
 package struct HelpSectionSnapshot {
-    let heading: String
-    let commands: [HelpCommandDescriptor]
-    let paragraphs: [String]
+    package let heading: String
+    package let commands: [HelpCommandDescriptor]
+    package let paragraphs: [String]
 }
 
 package struct HelpSnapshot {
-    let title: String
-    let subtitle: String
-    let sections: [HelpSectionSnapshot]
+    package let title: String
+    package let subtitle: String
+    package let sections: [HelpSectionSnapshot]
 }
 
 package struct CrisisOptionsSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let summaryRows: [String]
-    let measures: [CrisisMeasure]
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let summaryRows: [String]
+    package let measures: [CrisisMeasure]
 }
 
 package struct StatusSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let sections: [InfoSection]
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let sections: [InfoSection]
 }
 
 package struct GameOverSnapshot {
-    let context: GamePresentationSnapshot
-    let title: String
-    let introduction: [String]
-    let finalStateSection: InfoSection
-    let scenarioGoals: [ScenarioGoalDescriptor]
-    let scenarioAssessment: ScenarioAssessmentSnapshot?
-    let reviewSection: InfoSection
-    let failureDiagnosisSection: InfoSection?
-    let scoreSection: InfoSection
+    package let context: GamePresentationSnapshot
+    package let title: String
+    package let introduction: [String]
+    package let finalStateSection: InfoSection
+    package let scenarioGoals: [ScenarioGoalDescriptor]
+    package let scenarioAssessment: ScenarioAssessmentSnapshot?
+    package let reviewSection: InfoSection
+    package let failureDiagnosisSection: InfoSection?
+    package let scoreSection: InfoSection
 }
 
 extension GameSession {
-    func makePresentationSnapshot() -> GamePresentationSnapshot {
+    package func makePresentationSnapshot() -> GamePresentationSnapshot {
         GamePresentationSnapshot(
             campaignTitle: campaignTitle,
             campaignRange: campaignRange,
@@ -295,14 +295,14 @@ extension GameSession {
         )
     }
 
-    func makeDashboardSnapshot() -> DashboardSnapshot {
+    package func makeDashboardSnapshot() -> DashboardSnapshot {
         buildDashboardSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot()
         )
     }
 
-    func makePreviewSnapshot(changes: [PolicyChange]) -> PreviewSnapshot {
+    package func makePreviewSnapshot(changes: [PolicyChange]) -> PreviewSnapshot {
         let preview = preview(changes: changes)
         return buildPreviewSnapshot(
             estimate: preview.estimate,
@@ -313,7 +313,7 @@ extension GameSession {
         )
     }
 
-    func makeAdvisorSnapshot(topic: String? = nil) -> AdvisorSnapshot {
+    package func makeAdvisorSnapshot(topic: String? = nil) -> AdvisorSnapshot {
         buildAdvisorSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
@@ -321,7 +321,7 @@ extension GameSession {
         )
     }
 
-    func makeReportSnapshot() -> ReportSnapshot {
+    package func makeReportSnapshot() -> ReportSnapshot {
         buildReportSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
@@ -331,7 +331,7 @@ extension GameSession {
         )
     }
 
-    func makeDebriefSnapshot() -> DebriefSnapshot {
+    package func makeDebriefSnapshot() -> DebriefSnapshot {
         buildDebriefSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
@@ -340,7 +340,7 @@ extension GameSession {
         )
     }
 
-    func makeTutorialSnapshot() -> TutorialSnapshot {
+    package func makeTutorialSnapshot() -> TutorialSnapshot {
         buildTutorialSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
@@ -350,33 +350,33 @@ extension GameSession {
         )
     }
 
-    func makeScenarioBriefingSnapshot() -> ScenarioBriefingSnapshot? {
+    package func makeScenarioBriefingSnapshot() -> ScenarioBriefingSnapshot? {
         guard let scenario else { return nil }
         return buildScenarioBriefingSnapshot(scenario: scenario)
     }
 
-    func makeHistorySnapshot() -> HistorySnapshot {
+    package func makeHistorySnapshot() -> HistorySnapshot {
         buildHistorySnapshot(
             simulator: simulator,
             context: makePresentationSnapshot()
         )
     }
 
-    func makeNewsSnapshot() -> NewsSnapshot {
+    package func makeNewsSnapshot() -> NewsSnapshot {
         buildNewsSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot()
         )
     }
 
-    func makeCrisisOptionsSnapshot() -> CrisisOptionsSnapshot {
+    package func makeCrisisOptionsSnapshot() -> CrisisOptionsSnapshot {
         buildCrisisOptionsSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot()
         )
     }
 
-    func makeStatusSnapshot() -> StatusSnapshot {
+    package func makeStatusSnapshot() -> StatusSnapshot {
         buildStatusSnapshot(
             simulator: simulator,
             context: makePresentationSnapshot(),
@@ -385,7 +385,7 @@ extension GameSession {
         )
     }
 
-    func makeGameOverSnapshot(outcome: GameOutcome) -> GameOverSnapshot {
+    package func makeGameOverSnapshot(outcome: GameOutcome) -> GameOverSnapshot {
         buildGameOverSnapshot(
             outcome: outcome,
             simulator: simulator,
@@ -397,20 +397,20 @@ extension GameSession {
     }
 }
 
-func makeDashboardSnapshot(simulator: EconomicSimulator,
-                           gameLength: GameLength = .short,
-                           scenarioID: String? = nil) -> DashboardSnapshot {
+package func makeDashboardSnapshot(simulator: EconomicSimulator,
+                                   gameLength: GameLength = .short,
+                                   scenarioID: String? = nil) -> DashboardSnapshot {
     buildDashboardSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID)
     )
 }
 
-func makePreviewSnapshot(estimate: ForecastEstimate,
-                         gameLength: GameLength = .short,
-                         scenarioID: String? = nil,
-                         headerNote: String? = nil,
-                         baselineEstimate: ForecastEstimate? = nil) -> PreviewSnapshot {
+package func makePreviewSnapshot(estimate: ForecastEstimate,
+                                 gameLength: GameLength = .short,
+                                 scenarioID: String? = nil,
+                                 headerNote: String? = nil,
+                                 baselineEstimate: ForecastEstimate? = nil) -> PreviewSnapshot {
     buildPreviewSnapshot(
         estimate: estimate,
         context: makePresentationContext(simulator: nil, gameLength: gameLength, scenarioID: scenarioID, quarterLabel: estimate.estimatedAfter.quarterLabel),
@@ -420,10 +420,10 @@ func makePreviewSnapshot(estimate: ForecastEstimate,
     )
 }
 
-func makeAdvisorSnapshot(simulator: EconomicSimulator,
-                         topicText: String? = nil,
-                         gameLength: GameLength = .short,
-                         scenarioID: String? = nil) -> AdvisorSnapshot {
+package func makeAdvisorSnapshot(simulator: EconomicSimulator,
+                                 topicText: String? = nil,
+                                 gameLength: GameLength = .short,
+                                 scenarioID: String? = nil) -> AdvisorSnapshot {
     buildAdvisorSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
@@ -431,9 +431,9 @@ func makeAdvisorSnapshot(simulator: EconomicSimulator,
     )
 }
 
-func makeReportSnapshot(simulator: EconomicSimulator,
-                        gameLength: GameLength,
-                        scenarioID: String? = nil) -> ReportSnapshot {
+package func makeReportSnapshot(simulator: EconomicSimulator,
+                                gameLength: GameLength,
+                                scenarioID: String? = nil) -> ReportSnapshot {
     buildReportSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
@@ -442,9 +442,9 @@ func makeReportSnapshot(simulator: EconomicSimulator,
     )
 }
 
-func makeDebriefSnapshot(simulator: EconomicSimulator,
-                         gameLength: GameLength = .short,
-                         scenarioID: String? = nil) -> DebriefSnapshot {
+package func makeDebriefSnapshot(simulator: EconomicSimulator,
+                                 gameLength: GameLength = .short,
+                                 scenarioID: String? = nil) -> DebriefSnapshot {
     buildDebriefSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
@@ -453,10 +453,10 @@ func makeDebriefSnapshot(simulator: EconomicSimulator,
     )
 }
 
-func makeTutorialSnapshot(simulator: EconomicSimulator,
-                          mode: GameMode,
-                          gameLength: GameLength,
-                          scenarioID: String? = nil) -> TutorialSnapshot {
+package func makeTutorialSnapshot(simulator: EconomicSimulator,
+                                  mode: GameMode,
+                                  gameLength: GameLength,
+                                  scenarioID: String? = nil) -> TutorialSnapshot {
     buildTutorialSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
@@ -466,7 +466,7 @@ func makeTutorialSnapshot(simulator: EconomicSimulator,
     )
 }
 
-func makeScenarioBriefingSnapshot(scenario: ScenarioDefinition) -> ScenarioBriefingSnapshot {
+package func makeScenarioBriefingSnapshot(scenario: ScenarioDefinition) -> ScenarioBriefingSnapshot {
     buildScenarioBriefingSnapshot(scenario: scenario)
 }
 
@@ -480,36 +480,36 @@ private func buildScenarioBriefingSnapshot(scenario: ScenarioDefinition) -> Scen
     )
 }
 
-func makeHistorySnapshot(simulator: EconomicSimulator,
-                         gameLength: GameLength = .short,
-                         scenarioID: String? = nil) -> HistorySnapshot {
+package func makeHistorySnapshot(simulator: EconomicSimulator,
+                                 gameLength: GameLength = .short,
+                                 scenarioID: String? = nil) -> HistorySnapshot {
     buildHistorySnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID)
     )
 }
 
-func makeNewsSnapshot(simulator: EconomicSimulator,
-                      gameLength: GameLength = .short,
-                      scenarioID: String? = nil) -> NewsSnapshot {
+package func makeNewsSnapshot(simulator: EconomicSimulator,
+                              gameLength: GameLength = .short,
+                              scenarioID: String? = nil) -> NewsSnapshot {
     buildNewsSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID)
     )
 }
 
-func makeCrisisOptionsSnapshot(simulator: EconomicSimulator,
-                               gameLength: GameLength = .short,
-                               scenarioID: String? = nil) -> CrisisOptionsSnapshot {
+package func makeCrisisOptionsSnapshot(simulator: EconomicSimulator,
+                                       gameLength: GameLength = .short,
+                                       scenarioID: String? = nil) -> CrisisOptionsSnapshot {
     buildCrisisOptionsSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID)
     )
 }
 
-func makeStatusSnapshot(simulator: EconomicSimulator,
-                        gameLength: GameLength,
-                        scenarioID: String? = nil) -> StatusSnapshot {
+package func makeStatusSnapshot(simulator: EconomicSimulator,
+                                gameLength: GameLength,
+                                scenarioID: String? = nil) -> StatusSnapshot {
     buildStatusSnapshot(
         simulator: simulator,
         context: makePresentationContext(simulator: simulator, gameLength: gameLength, scenarioID: scenarioID),
@@ -518,10 +518,10 @@ func makeStatusSnapshot(simulator: EconomicSimulator,
     )
 }
 
-func makeGameOverSnapshot(outcome: GameOutcome,
-                          simulator: EconomicSimulator,
-                          gameLength: GameLength,
-                          scenarioID: String? = nil) -> GameOverSnapshot {
+package func makeGameOverSnapshot(outcome: GameOutcome,
+                                  simulator: EconomicSimulator,
+                                  gameLength: GameLength,
+                                  scenarioID: String? = nil) -> GameOverSnapshot {
     buildGameOverSnapshot(
         outcome: outcome,
         simulator: simulator,
@@ -531,8 +531,8 @@ func makeGameOverSnapshot(outcome: GameOutcome,
     )
 }
 
-func makeHelpSnapshot(gameLength: GameLength,
-                      scenarioID: String? = nil) -> HelpSnapshot {
+package func makeHelpSnapshot(gameLength: GameLength,
+                              scenarioID: String? = nil) -> HelpSnapshot {
     let scenarioNote = scenarioID.flatMap { scenarioDefinition(id: $0) }.map { scenario in
         "Current scenario: \(scenario.title). Its objectives override generic survival instincts."
     }
@@ -737,10 +737,10 @@ func makeHelpSnapshot(gameLength: GameLength,
     )
 }
 
-func makePresentationContext(simulator: EconomicSimulator?,
-                             gameLength: GameLength,
-                             scenarioID: String?,
-                             quarterLabel: String? = nil) -> GamePresentationSnapshot {
+package func makePresentationContext(simulator: EconomicSimulator?,
+                                     gameLength: GameLength,
+                                     scenarioID: String?,
+                                     quarterLabel: String? = nil) -> GamePresentationSnapshot {
     let scenario = scenarioDefinition(id: scenarioID)
     return GamePresentationSnapshot(
         campaignTitle: campaignDisplayTitle(gameLength: gameLength, scenarioID: scenarioID),
@@ -2499,12 +2499,12 @@ private func percentagePointText(_ value: Double, allowZero: Bool) -> String? {
     return String(format: "%+.\(1)fpp", value * 100)
 }
 
-func displayedExchangeRate(_ internalRate: Double) -> Double {
+package func displayedExchangeRate(_ internalRate: Double) -> Double {
     guard internalRate > 0 else { return 0.0 }
     return 1.0 / internalRate
 }
 
-func displayedExchangeRateQoQChange(_ internalQoQChange: Double) -> Double {
+package func displayedExchangeRateQoQChange(_ internalQoQChange: Double) -> Double {
     let denominator = 1.0 + internalQoQChange
     guard denominator > 0 else { return 0.0 }
     return (1.0 / denominator) - 1.0

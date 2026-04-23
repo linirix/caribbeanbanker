@@ -11,11 +11,11 @@ import Foundation
 // The simulator still applies the report to its internal state as a side
 // effect (for ergonomics), but external code is free to treat the report as
 // the authoritative description of the quarter and ignore `simulator.state`.
-struct QuarterReport {
-    let stateBefore: EconomicState
-    let stateAfter: EconomicState
-    let events: [EconomicEvent]
+package struct QuarterReport {
+    package let stateBefore: EconomicState
+    package let stateAfter: EconomicState
+    package let events: [EconomicEvent]
     // News items generated this quarter, in emission order:
     // event descriptions first, then reserve alarms, then macro commentary.
-    let news: [String]
+    package let news: [String]
 }

@@ -3,14 +3,10 @@ import PackageDescription
 
 let coreSources = [
     "Sources/CentralBanker/Advisor.swift",
-    "Sources/CentralBanker/BalanceHarness.swift",
     "Sources/CentralBanker/Cabinet.swift",
-    "Sources/CentralBanker/CLIOptions.swift",
-    "Sources/CentralBanker/Commands.swift",
     "Sources/CentralBanker/Communication.swift",
     "Sources/CentralBanker/CrisisMeasures.swift",
     "Sources/CentralBanker/Difficulty.swift",
-    "Sources/CentralBanker/Display.swift",
     "Sources/CentralBanker/Economy.swift",
     "Sources/CentralBanker/Events.swift",
     "Sources/CentralBanker/ExternalEnvironment.swift",
@@ -20,14 +16,22 @@ let coreSources = [
     "Sources/CentralBanker/GameSession.swift",
     "Sources/CentralBanker/ModelParameters.swift",
     "Sources/CentralBanker/OpeningConditions.swift",
+    "Sources/CentralBanker/PolicyChange.swift",
     "Sources/CentralBanker/Presentation.swift",
     "Sources/CentralBanker/QuarterReport.swift",
     "Sources/CentralBanker/Random.swift",
     "Sources/CentralBanker/SaveLoad.swift",
     "Sources/CentralBanker/Scenario.swift",
     "Sources/CentralBanker/ScoreCard.swift",
-    "Sources/CentralBanker/SessionLog.swift",
-    "Sources/CentralBanker/TerminalApp.swift"
+    "Sources/CentralBanker/SessionLog.swift"
+]
+
+let terminalSources = [
+    "BalanceHarness.swift",
+    "CLIOptions.swift",
+    "Commands.swift",
+    "Display.swift",
+    "TerminalApp.swift"
 ]
 
 let package = Package(
@@ -41,6 +45,10 @@ let package = Package(
         .executable(
             name: "CentralBanker",
             targets: ["CentralBanker"]
+        ),
+        .library(
+            name: "CentralBankerTerminal",
+            targets: ["CentralBankerTerminal"]
         )
     ],
     targets: [
@@ -56,6 +64,7 @@ let package = Package(
                 "README.md",
                 "scripts",
                 "Sources/CentralBankerApp",
+                "Sources/CentralBankerTerminal",
                 "Tests",
                 "run.sh"
             ],
@@ -64,14 +73,20 @@ let package = Package(
                 .copy("Config")
             ]
         ),
+        .target(
+            name: "CentralBankerTerminal",
+            dependencies: ["CentralBankerCore"],
+            path: "Sources/CentralBankerTerminal",
+            sources: terminalSources
+        ),
         .executableTarget(
             name: "CentralBanker",
-            dependencies: ["CentralBankerCore"],
+            dependencies: ["CentralBankerCore", "CentralBankerTerminal"],
             path: "Sources/CentralBankerApp"
         ),
         .testTarget(
             name: "CentralBankerTests",
-            dependencies: ["CentralBankerCore"],
+            dependencies: ["CentralBankerCore", "CentralBankerTerminal"],
             path: "Tests/CentralBankerTests"
         ),
     ]

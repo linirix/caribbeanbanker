@@ -8,67 +8,67 @@ import Foundation
 // on `ExternalEnvironment`. Narrative news and chart history live on
 // `SessionLog`. Keeping those separate makes `EconomicState` easy to diff,
 // serialise, and reason about in isolation.
-struct EconomicState: Codable {
+package struct EconomicState: Codable {
     // --- Real Economy ---
-    var realGDP: Double = 100.0
-    var potentialGDP: Double = 100.0
-    var outputGap: Double = 0.0           // (Y - Y*)/Y*
-    var gdpGrowthQoQ: Double = 0.0        // quarterly real growth rate
+    package var realGDP: Double = 100.0
+    package var potentialGDP: Double = 100.0
+    package var outputGap: Double = 0.0           // (Y - Y*)/Y*
+    package var gdpGrowthQoQ: Double = 0.0        // quarterly real growth rate
 
     // --- Prices ---
-    var priceLevel: Double = 100.0
-    var inflation: Double = 0.055         // annual CPI
-    var coreInflation: Double = 0.050
-    var expectedInflation: Double = 0.050
+    package var priceLevel: Double = 100.0
+    package var inflation: Double = 0.055         // annual CPI
+    package var coreInflation: Double = 0.050
+    package var expectedInflation: Double = 0.050
 
     // --- Labor ---
-    var unemployment: Double = 0.065
-    var nairu: Double = 0.070             // natural rate (high in 70s)
+    package var unemployment: Double = 0.065
+    package var nairu: Double = 0.070             // natural rate (high in 70s)
 
     // --- Monetary ---
-    var policyRate: Double = 0.060        // central bank discount rate
-    var reserveRequirement: Double = 0.12
-    var m2Growth: Double = 0.080
-    var bankCreditGrowth: Double = 0.100
-    var credibility: Double = 0.70        // 0–1
+    package var policyRate: Double = 0.060        // central bank discount rate
+    package var reserveRequirement: Double = 0.12
+    package var m2Growth: Double = 0.080
+    package var bankCreditGrowth: Double = 0.100
+    package var credibility: Double = 0.70        // 0–1
 
     // --- External financial position ---
-    var exchangeRate: Double = 1.00       // SLD per USD
-    var exchangeRateQoQChange: Double = 0.0
-    var currentAccountGDP: Double = -0.025
-    var capitalAccountGDP: Double = 0.008
-    var foreignReservesMonths: Double = 4.20
-    var capitalControls: Double = 0.30    // 0=open, 1=closed
-    var externalDebtGDP: Double = 0.30
+    package var exchangeRate: Double = 1.00       // SLD per USD
+    package var exchangeRateQoQChange: Double = 0.0
+    package var currentAccountGDP: Double = -0.025
+    package var capitalAccountGDP: Double = 0.008
+    package var foreignReservesMonths: Double = 4.20
+    package var capitalControls: Double = 0.30    // 0=open, 1=closed
+    package var externalDebtGDP: Double = 0.30
 
     // --- Fiscal ---
-    var fiscalBalanceGDP: Double = -0.040
-    var governmentDebtGDP: Double = 0.500
+    package var fiscalBalanceGDP: Double = -0.040
+    package var governmentDebtGDP: Double = 0.500
 
     // --- Political ---
-    var politicalPressure: Double = 24.0  // 0–100
-    var publicApproval: Double = 52.0     // 0–100
+    package var politicalPressure: Double = 24.0  // 0–100
+    package var publicApproval: Double = 52.0     // 0–100
 
     // --- Quarter-over-quarter deltas (set each simulation step) ---
-    var inflationDelta: Double = 0.0
-    var expectedInflationDelta: Double = 0.0
-    var outputGapDelta: Double = 0.0
+    package var inflationDelta: Double = 0.0
+    package var expectedInflationDelta: Double = 0.0
+    package var outputGapDelta: Double = 0.0
 
     // --- Time ---
-    var quarter: Int = 1
-    var year: Int = 1973
+    package var quarter: Int = 1
+    package var year: Int = 1973
 
-    var quarterLabel: String { "Q\(quarter) \(year)" }
-    var annualizedGDPGrowth: Double { gdpGrowthQoQ * 4.0 }
-    var realInterestRate: Double { policyRate - expectedInflation }
+    package var quarterLabel: String { "Q\(quarter) \(year)" }
+    package var annualizedGDPGrowth: Double { gdpGrowthQoQ * 4.0 }
+    package var realInterestRate: Double { policyRate - expectedInflation }
 
-    mutating func advanceTime() {
+    package mutating func advanceTime() {
         quarter += 1
         if quarter > 4 { quarter = 1; year += 1 }
     }
 }
 
-enum GameOutcome: String, Codable, Hashable {
+package enum GameOutcome: String, Codable, Hashable {
     case ongoing
     case currencyCrisis
     case hyperinflation
@@ -77,14 +77,14 @@ enum GameOutcome: String, Codable, Hashable {
     case success
 }
 
-class EconomicSimulator {
-    var state: EconomicState
-    var environment: ExternalEnvironment
+package class EconomicSimulator {
+    package var state: EconomicState
+    package var environment: ExternalEnvironment
     var log: SessionLog
-    var scoreCard: ScoreCard
-    var communicationStance: CommunicationStance = .balanced
-    var activeCabinetRequest: CabinetRequest? = nil
-    var crisisCooldownQuarters: Int = 0
+    package var scoreCard: ScoreCard
+    package var communicationStance: CommunicationStance = .balanced
+    package var activeCabinetRequest: CabinetRequest? = nil
+    package var crisisCooldownQuarters: Int = 0
     let params: ModelParameters
     // The difficulty label this simulator was constructed under. Used for
     // display and save/load; the coefficient values themselves live on
@@ -95,17 +95,17 @@ class EconomicSimulator {
     // The simulator owns its RNG. External code (e.g. `generateEvents`) that
     // needs shared randomness should pass `&simulator.rng` as `inout` so that
     // every stochastic choice in the session draws from a single, seeded stream.
-    var rng: SeededRandomGenerator
+    package var rng: SeededRandomGenerator
     // Internal (not private) so save/load can persist the full deterministic
     // state. They're part of the sim's AR(1) noise processes: zeroing them on
     // load would create a one-quarter discontinuity in demand/supply shocks.
-    var demandNoiseCarry: Double = 0.0
-    var supplyNoiseCarry: Double = 0.0
+    package var demandNoiseCarry: Double = 0.0
+    package var supplyNoiseCarry: Double = 0.0
     // Short-lived support from successful external-defense actions. These let
     // intervention and tighter controls buy a few quarters of breathing room
     // instead of disappearing immediately after one turn.
-    var interventionSupportCarry: Double = 0.0
-    var controlsReliefCarry: Double = 0.0
+    package var interventionSupportCarry: Double = 0.0
+    package var controlsReliefCarry: Double = 0.0
 
     init(state: EconomicState = EconomicState(),
          environment: ExternalEnvironment = ExternalEnvironment(),
@@ -124,7 +124,7 @@ class EconomicSimulator {
     }
 
     @discardableResult
-    func simulateQuarter(events: [EconomicEvent]) -> QuarterReport {
+    package func simulateQuarter(events: [EconomicEvent]) -> QuarterReport {
         let stateBefore = state
         var s = state
         var env = environment
@@ -485,7 +485,7 @@ class EconomicSimulator {
         news.append(contentsOf: msgs)
     }
 
-    func applyFXIntervention(months: Double) {
+    package func applyFXIntervention(months: Double) {
         // Positive months = accumulate reserves (sell SLD, weaken it → higher SLD/USD)
         // Negative months = spend reserves to defend the SLD (buy SLD, strengthen it → lower SLD/USD)
         state.foreignReservesMonths += months
@@ -500,7 +500,7 @@ class EconomicSimulator {
         }
     }
 
-    func setCapitalControls(_ value: Double) {
+    package func setCapitalControls(_ value: Double) {
         let old = state.capitalControls
         state.capitalControls = (0.0...1.0).clamping(value)
         let tightening = max(0.0, state.capitalControls - old)
@@ -509,7 +509,7 @@ class EconomicSimulator {
         }
     }
 
-    func checkOutcome() -> GameOutcome {
+    package func checkOutcome() -> GameOutcome {
         let s = state
         let o = params.outcomes
         if s.foreignReservesMonths < o.currencyCrisisReserves { return .currencyCrisis }
@@ -523,7 +523,7 @@ class EconomicSimulator {
         return .ongoing
     }
 
-    func maybeIssueCabinetRequest() {
+    package func maybeIssueCabinetRequest() {
         guard activeCabinetRequest == nil else { return }
         guard let request = generateCabinetRequest(for: state) else { return }
         activeCabinetRequest = request
@@ -531,14 +531,14 @@ class EconomicSimulator {
                     quarterLabel: state.quarterLabel)
     }
 
-    func describeCabinetRequest() -> String {
+    package func describeCabinetRequest() -> String {
         guard let request = activeCabinetRequest else {
             return "No active cabinet request this quarter."
         }
         return "Cabinet request: \(request.title). \(request.detail) Use accept, reject, or delay."
     }
 
-    func acceptCabinetRequest() -> String {
+    package func acceptCabinetRequest() -> String {
         guard let request = activeCabinetRequest else {
             return "No active cabinet request to accept."
         }
@@ -572,7 +572,7 @@ class EconomicSimulator {
         return message
     }
 
-    func rejectCabinetRequest() -> String {
+    package func rejectCabinetRequest() -> String {
         guard let request = activeCabinetRequest else {
             return "No active cabinet request to reject."
         }
@@ -584,7 +584,7 @@ class EconomicSimulator {
         return "Rejected cabinet request. Political pressure has increased."
     }
 
-    func delayCabinetRequest() -> String {
+    package func delayCabinetRequest() -> String {
         guard activeCabinetRequest != nil else {
             return "No active cabinet request to delay."
         }
@@ -592,7 +592,7 @@ class EconomicSimulator {
         return "Delayed cabinet request. Pressure ticks higher while the issue remains unresolved."
     }
 
-    func deferCabinetRequestIfNeeded() {
+    package func deferCabinetRequestIfNeeded() {
         guard activeCabinetRequest != nil else { return }
         applyCabinetDelayPenalty(prefix: "CABINET: You advanced the quarter without answering. The cabinet reads it as stonewalling.")
     }
@@ -618,7 +618,7 @@ class EconomicSimulator {
     // rng noise-carries) stay local to the clone. Used by `preview` and
     // `what_if` so the player can see projected outcomes without consuming
     // the session's RNG stream or touching the real state.
-    func cloneForPreview() -> EconomicSimulator {
+    package func cloneForPreview() -> EconomicSimulator {
         // SessionLog and ScoreCard are value types, so this creates independent
         // copies for preview work rather than aliasing the live simulator state.
         let c = EconomicSimulator(state: self.state,
@@ -637,6 +637,10 @@ class EconomicSimulator {
         c.activeCabinetRequest = self.activeCabinetRequest
         c.crisisCooldownQuarters = self.crisisCooldownQuarters
         return c
+    }
+
+    package var neutralRealRate: Double {
+        params.outputGap.neutralRealRate
     }
 
     func isHawkishCommunicationConsistent(state s: EconomicState? = nil) -> Bool {

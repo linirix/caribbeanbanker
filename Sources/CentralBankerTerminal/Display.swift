@@ -1,4 +1,8 @@
 import Foundation
+import CentralBankerCore
+#if canImport(Darwin)
+import Darwin
+#endif
 
 // ANSI escape codes
 enum A {
@@ -73,12 +77,58 @@ private func pad(_ s: String, to width: Int, char: Character = " ") -> String {
 }
 
 // ─── Layout constants ───────────────────────────────────────────────────────
-private let W = 82          // total width
-private let IW = 80         // inner width (between outer borders)
-private let LC = 37         // left cell content width (after padding strip)
-private let RC = 38         // right cell content width
+private struct DisplayLayout {
+    let totalWidth: Int
+    let innerWidth: Int
+    let leftColumnWidth: Int
+    let rightColumnWidth: Int
+    let stackedDashboard: Bool
 
-let displayFrameWidth = W
+    static func detect() -> DisplayLayout {
+        let detected = detectedTerminalColumns()
+        let totalWidth = min(max(detected ?? 82, 68), 110)
+        let innerWidth = max(64, totalWidth - 2)
+        let stackedDashboard = totalWidth < 90
+        let splitWidth = max(48, innerWidth - 5)
+        let leftColumnWidth = max(22, splitWidth / 2)
+        let rightColumnWidth = max(22, splitWidth - leftColumnWidth)
+        return DisplayLayout(
+            totalWidth: totalWidth,
+            innerWidth: innerWidth,
+            leftColumnWidth: leftColumnWidth,
+            rightColumnWidth: rightColumnWidth,
+            stackedDashboard: stackedDashboard
+        )
+    }
+}
+
+private func detectedTerminalColumns() -> Int? {
+    if let env = ProcessInfo.processInfo.environment["COLUMNS"],
+       let columns = Int(env),
+       columns > 0 {
+        return columns
+    }
+
+    #if canImport(Darwin)
+    var windowSize = winsize()
+    if ioctl(STDOUT_FILENO, TIOCGWINSZ, &windowSize) == 0, windowSize.ws_col > 0 {
+        return Int(windowSize.ws_col)
+    }
+    #endif
+
+    return nil
+}
+
+private func currentDisplayLayout() -> DisplayLayout {
+    DisplayLayout.detect()
+}
+
+private var W: Int { currentDisplayLayout().totalWidth }
+private var IW: Int { currentDisplayLayout().innerWidth }
+private var LC: Int { currentDisplayLayout().leftColumnWidth }
+private var RC: Int { currentDisplayLayout().rightColumnWidth }
+
+var displayFrameWidth: Int { W }
 
 // Box-drawing characters
 private let TL = "╔"; private let TR = "╗"
@@ -180,6 +230,31 @@ private func wrappedRows(_ text: String, indent: String = "  ", width: Int = IW 
             current = indent + word
         }
     }
+    rows.append(current)
+    return rows
+}
+
+private func wrappedTokenRows(prefix: String,
+                              tokens: [String],
+                              width: Int) -> [String] {
+    guard !tokens.isEmpty else { return [prefix] }
+
+    let continuation = String(repeating: " ", count: max(2, vlen(prefix)))
+    var rows: [String] = []
+    var current = prefix
+
+    for token in tokens {
+        let candidate = current == prefix || current == continuation
+            ? current + token
+            : current + " " + token
+        if vlen(candidate) <= width {
+            current = candidate
+        } else {
+            rows.append(current)
+            current = continuation + token
+        }
+    }
+
     rows.append(current)
     return rows
 }
@@ -314,6 +389,7 @@ private func formattedActionTokens(from section: ActionSectionDescriptor) -> [St
 }
 
 func renderDashboard(_ snapshot: DashboardSnapshot) -> String {
+    let layout = currentDisplayLayout()
     var lines: [String] = []
 
     // Title bar
@@ -325,16 +401,34 @@ func renderDashboard(_ snapshot: DashboardSnapshot) -> String {
     lines.append(VV + " " + dateSection + " " + VV)
     lines.append(hline(ML, HH, MR))
 
-    for section in snapshot.metricSections {
-        lines.append(sheader("  \(section.leftHeading)", "  \(section.rightHeading)"))
-        lines.append(crow(pad("", to: LC), pad("", to: RC)))
-        for row in section.rows {
-            lines.append(crow(
-                row.left.map(renderMetric) ?? pad("", to: LC),
-                row.right.map(renderMetric) ?? pad("", to: RC)
-            ))
+    for (index, section) in snapshot.metricSections.enumerated() {
+        if layout.stackedDashboard {
+            lines.append(frow(A.bold + A.cyan + "  \(section.leftHeading)" + A.reset))
+            lines.append(frow(""))
+            for row in section.rows {
+                if let left = row.left {
+                    lines.append(frow(renderMetric(left)))
+                }
+            }
+            lines.append(frow(""))
+            lines.append(frow(A.bold + A.cyan + "  \(section.rightHeading)" + A.reset))
+            lines.append(frow(""))
+            for row in section.rows {
+                if let right = row.right {
+                    lines.append(frow(renderMetric(right)))
+                }
+            }
+        } else {
+            lines.append(sheader("  \(section.leftHeading)", "  \(section.rightHeading)"))
+            lines.append(crow(pad("", to: LC), pad("", to: RC)))
+            for row in section.rows {
+                lines.append(crow(
+                    row.left.map(renderMetric) ?? pad("", to: LC),
+                    row.right.map(renderMetric) ?? pad("", to: RC)
+                ))
+            }
         }
-        if section.leftHeading != snapshot.metricSections.last?.leftHeading {
+        if index < snapshot.metricSections.count - 1 {
             lines.append(hline(ML, HH, MR))
         }
     }
@@ -359,21 +453,10 @@ func renderDashboard(_ snapshot: DashboardSnapshot) -> String {
     } else {
         for i in 0..<newsToShow {
             let entry = snapshot.recentNews[i]
-            // First entry is most recent — highlight it
-            let formatted = i == 0
-                ? "  " + A.white + entry + A.reset
-                : "  " + A.dim + entry + A.reset
-            // Wrap if too long
-            let maxLen = IW - 4
-            if vlen(entry) + 2 <= maxLen {
-                lines.append(frow(formatted))
-            } else {
-                // Simple truncation with ellipsis
-                let truncated = String(entry.prefix(maxLen - 3)) + "..."
-                let display = i == 0
-                    ? "  " + A.white + truncated + A.reset
-                    : "  " + A.dim + truncated + A.reset
-                lines.append(frow(display))
+            let prefix = i == 0 ? "  " : "    "
+            let color = i == 0 ? A.white : A.dim
+            for row in wrappedRows(entry, indent: prefix, width: IW - 2) {
+                lines.append(frow(color + row + A.reset))
             }
         }
     }
@@ -384,7 +467,12 @@ func renderDashboard(_ snapshot: DashboardSnapshot) -> String {
     lines.append(hline(ML, HH, MR))
     lines.append(frow(A.dim + "  " + snapshot.footerLegend + A.reset))
     for section in snapshot.actionSections {
-        lines.append(frow("  " + A.bold + section.title + ":" + A.reset + " " + formattedActionTokens(from: section).joined(separator: " ")))
+        let prefix = "  " + A.bold + section.title + ":" + A.reset + " "
+        for row in wrappedTokenRows(prefix: prefix,
+                                    tokens: formattedActionTokens(from: section),
+                                    width: IW - 2) {
+            lines.append(frow(row))
+        }
     }
     lines.append(hline(ML, HH, MR))
     lines.append(frow(A.bold + "  Governor > " + A.reset))
@@ -863,7 +951,7 @@ func renderStatus(_ snapshot: StatusSnapshot) -> String {
         for row in section.rows {
             if let colon = row.firstIndex(of: ":") {
                 let label = String(row[...colon])
-                let value = row[row.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+                let value = row[row.index(after: colon)...].trimmingCharacters(in: CharacterSet.whitespaces)
                 lines.append(frow("    " + pad(label, to: 23) + value))
             } else {
                 appendWrappedText(&lines, row, indent: "    ")

@@ -1,58 +1,58 @@
 import Foundation
 
-enum GameLength: String, Codable, CaseIterable {
+package enum GameLength: String, Codable, CaseIterable {
     case short
     case extended
 
-    var displayName: String {
+    package var displayName: String {
         switch self {
         case .short: return "Short"
         case .extended: return "Extended"
         }
     }
 
-    var rangeLabel: String {
+    package var rangeLabel: String {
         switch self {
         case .short: return "1973–1982"
         case .extended: return "1960–2000"
         }
     }
 
-    var startYear: Int {
+    package var startYear: Int {
         switch self {
         case .short: return 1973
         case .extended: return 1960
         }
     }
 
-    var successYear: Int {
+    package var successYear: Int {
         switch self {
         case .short: return 1982
         case .extended: return 2000
         }
     }
 
-    var totalQuarters: Int {
+    package var totalQuarters: Int {
         (successYear - startYear) * 4
     }
 
-    var scorePenaltyScale: Double {
+    package var scorePenaltyScale: Double {
         Double(GameLength.short.totalQuarters) / Double(totalQuarters)
     }
 
-    var startDateLabel: String {
+    package var startDateLabel: String {
         "January \(startYear)"
     }
 
-    var survivalTargetLabel: String {
+    package var survivalTargetLabel: String {
         "\(successYear)"
     }
 
-    var baseIndexLabel: String {
+    package var baseIndexLabel: String {
         "Q1 \(startYear)"
     }
 
-    var selectorDescription: String {
+    package var selectorDescription: String {
         switch self {
         case .short:
             return "36 quarters. The focused 1973–1982 crisis arc."
@@ -63,7 +63,7 @@ enum GameLength: String, Codable, CaseIterable {
 }
 
 extension ModelParameters {
-    func configured(for gameLength: GameLength) -> ModelParameters {
+    package func configured(for gameLength: GameLength) -> ModelParameters {
         var adjusted = self
         adjusted.outcomes.successYear = gameLength.successYear
         if let tuning = GameConfigs.lengthAdjustments(for: gameLength) {

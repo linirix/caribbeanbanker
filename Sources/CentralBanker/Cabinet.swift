@@ -1,11 +1,11 @@
 import Foundation
 
-enum CabinetRequestType: String, Codable, CaseIterable {
+package enum CabinetRequestType: String, Codable, CaseIterable {
     case cutRates
     case tightenControls
     case defendCurrency
 
-    var title: String {
+    package var title: String {
         switch self {
         case .cutRates:
             return "Cut Rates Now"
@@ -17,9 +17,9 @@ enum CabinetRequestType: String, Codable, CaseIterable {
     }
 }
 
-struct CabinetRequest: Codable {
-    var type: CabinetRequestType
-    var detail: String
+package struct CabinetRequest: Codable {
+    package var type: CabinetRequestType
+    package var detail: String
 
-    var title: String { type.title }
+    package var title: String { type.title }
 }

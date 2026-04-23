@@ -8,16 +8,16 @@ import Foundation
 //   • reproducible runs from a known seed, for testing and debugging
 //   • shareable scenarios ("try seed 12345, it's brutal")
 //   • the ability to add a future --seed CLI flag without rework.
-struct SeededRandomGenerator: RandomNumberGenerator, Codable {
+package struct SeededRandomGenerator: RandomNumberGenerator, Codable {
     private var state: UInt64
 
-    init(seed: UInt64) {
+    package init(seed: UInt64) {
         // Avoid the degenerate all-zero state; splitmix64 handles it fine
         // but a tiny nudge keeps early outputs well-mixed.
         self.state = seed == 0 ? 0xDEADBEEFCAFEBABE : seed
     }
 
-    mutating func next() -> UInt64 {
+    package mutating func next() -> UInt64 {
         state &+= 0x9E37_79B9_7F4A_7C15
         var z = state
         z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
@@ -28,6 +28,6 @@ struct SeededRandomGenerator: RandomNumberGenerator, Codable {
 
 // Generate a seed from the system RNG. Used when the player hasn't
 // supplied one explicitly.
-func freshSeed() -> UInt64 {
+package func freshSeed() -> UInt64 {
     UInt64.random(in: .min ... .max)
 }

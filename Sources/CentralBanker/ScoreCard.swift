@@ -7,35 +7,35 @@ import Foundation
 // `EconomicState` (which is the instantaneous snapshot): this is where the
 // integral-over-time measurements live, the kind of thing you can't recover
 // from a final-quarter state alone.
-struct ScoreCard: Codable {
+package struct ScoreCard: Codable {
     // Quarter counters. Thresholds here should match the thresholds the game
     // uses elsewhere so the scorecard tells the same story the dashboard did.
-    var quartersSimulated: Int = 0
-    var highInflationQuarters: Int = 0      // inflation > 8%
-    var severeInflationQuarters: Int = 0    // inflation > 15%
-    var recessionQuarters: Int = 0          // annualized GDP growth < -0.5%
-    var stagflationQuarters: Int = 0        // high inflation AND recession
-    var highUnemploymentQuarters: Int = 0   // unemployment > 8.5%
-    var lowCredibilityQuarters: Int = 0     // credibility < 0.50
-    var nearOusterQuarters: Int = 0         // political pressure > 70
+    package var quartersSimulated: Int = 0
+    package var highInflationQuarters: Int = 0      // inflation > 8%
+    package var severeInflationQuarters: Int = 0    // inflation > 15%
+    package var recessionQuarters: Int = 0          // annualized GDP growth < -0.5%
+    package var stagflationQuarters: Int = 0        // high inflation AND recession
+    package var highUnemploymentQuarters: Int = 0   // unemployment > 8.5%
+    package var lowCredibilityQuarters: Int = 0     // credibility < 0.50
+    package var nearOusterQuarters: Int = 0         // political pressure > 70
 
     // Extremes — peaks and troughs reached over the run.
-    var peakInflation: Double = 0.0
-    var troughGrowthAnnualized: Double = 0.0   // most negative
-    var peakUnemployment: Double = 0.0
-    var lowestCredibility: Double = 1.0
-    var lowestReserves: Double = 99.0
-    var peakPoliticalPressure: Double = 0.0
-    var peakExternalDebtGDP: Double = 0.0
+    package var peakInflation: Double = 0.0
+    package var troughGrowthAnnualized: Double = 0.0   // most negative
+    package var peakUnemployment: Double = 0.0
+    package var lowestCredibility: Double = 1.0
+    package var lowestReserves: Double = 99.0
+    package var peakPoliticalPressure: Double = 0.0
+    package var peakExternalDebtGDP: Double = 0.0
 
     // Policy-choice highlights. Not scored — just reported, so the player
     // sees what tools they actually reached for.
-    var peakPolicyRate: Double = 0.0
-    var peakCapitalControls: Double = 0.0
-    var peakReserveRequirement: Double = 0.0
-    var imfProgramsUsed: Int = 0
-    var bankHolidaysUsed: Int = 0
-    var emergencyLiquidityUsed: Int = 0
+    package var peakPolicyRate: Double = 0.0
+    package var peakCapitalControls: Double = 0.0
+    package var peakReserveRequirement: Double = 0.0
+    package var imfProgramsUsed: Int = 0
+    package var bankHolidaysUsed: Int = 0
+    package var emergencyLiquidityUsed: Int = 0
 
     enum CodingKeys: String, CodingKey {
         case quartersSimulated
@@ -61,9 +61,9 @@ struct ScoreCard: Codable {
         case emergencyLiquidityUsed
     }
 
-    init() {}
+    package init() {}
 
-    init(from decoder: Decoder) throws {
+    package init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         quartersSimulated = try container.decodeIfPresent(Int.self, forKey: .quartersSimulated) ?? 0
         highInflationQuarters = try container.decodeIfPresent(Int.self, forKey: .highInflationQuarters) ?? 0
@@ -91,7 +91,7 @@ struct ScoreCard: Codable {
     // Call once per simulated quarter, after all dynamics have been applied
     // but before `advanceTime()`. The simulator wires this in next to
     // `log.recordQuarter`.
-    mutating func record(_ s: EconomicState) {
+    package mutating func record(_ s: EconomicState) {
         let scoring = GameConfigs.tuning.scoring
         quartersSimulated += 1
         if s.inflation > scoring.tracking.highInflationThreshold { highInflationQuarters += 1 }
@@ -115,7 +115,7 @@ struct ScoreCard: Codable {
         peakReserveRequirement = Swift.max(peakReserveRequirement, s.reserveRequirement)
     }
 
-    mutating func recordCrisisMeasure(_ type: CrisisMeasureType) {
+    package mutating func recordCrisisMeasure(_ type: CrisisMeasureType) {
         switch type {
         case .imfProgram:
             imfProgramsUsed += 1
@@ -139,24 +139,24 @@ struct ScoreCard: Codable {
 //   • A rough-but-survived run (historical-mode default play) scores ~55-75.
 //   • A game-over outcome wipes out most of the score, regardless of other
 //     merits, because losing is losing.
-struct ScoreBreakdown {
-    struct LineItem {
-        let label: String
-        let points: Int           // negative = deduction, positive = bonus
+package struct ScoreBreakdown {
+    package struct LineItem {
+        package let label: String
+        package let points: Int           // negative = deduction, positive = bonus
     }
-    var baseline: Int
-    var items: [LineItem]
-    var final: Int
+    package var baseline: Int
+    package var items: [LineItem]
+    package var final: Int
 
     // A headline label for the end screen — "Volcker-Class Operator" for
     // pure runs, down to a neutral disaster label for failed mandates.
-    var headline: String
+    package var headline: String
 }
 
-func computeScore(outcome: GameOutcome,
-                  card: ScoreCard,
-                  gameLength: GameLength = .short,
-                  difficulty: Difficulty = .governor) -> ScoreBreakdown {
+package func computeScore(outcome: GameOutcome,
+                          card: ScoreCard,
+                          gameLength: GameLength = .short,
+                          difficulty: Difficulty = .governor) -> ScoreBreakdown {
     let scoring = GameConfigs.tuning.scoring
     let baseline = scoring.baseline
     var items: [ScoreBreakdown.LineItem] = []

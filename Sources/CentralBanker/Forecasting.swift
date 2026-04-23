@@ -2,14 +2,14 @@ import Foundation
 
 private let forecastSeedSalt: UInt64 = 0x4652_4353_545F_4553
 
-struct ForecastEstimate {
-    let report: QuarterReport
-    let estimatedAfter: EconomicState
+package struct ForecastEstimate {
+    package let report: QuarterReport
+    package let estimatedAfter: EconomicState
 }
 
-func forecastEstimate(for report: QuarterReport,
-                      sessionSeed: UInt64,
-                      changeSignature: UInt64 = 0) -> ForecastEstimate {
+package func forecastEstimate(for report: QuarterReport,
+                              sessionSeed: UInt64,
+                              changeSignature: UInt64 = 0) -> ForecastEstimate {
     var rng = SeededRandomGenerator(
         seed: sessionSeed
             ^ forecastSeedSalt
@@ -48,7 +48,7 @@ func forecastEstimate(for report: QuarterReport,
     return ForecastEstimate(report: report, estimatedAfter: estimated)
 }
 
-func previewChangeSignature(_ changes: [PolicyChange]) -> UInt64 {
+package func previewChangeSignature(_ changes: [PolicyChange]) -> UInt64 {
     changes.reduce(0x5052_5657_4B45_5953) { partial, change in
         let valueBits: UInt64
         let tag: UInt64

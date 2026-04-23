@@ -9,17 +9,17 @@ import Foundation
 // Only the difficulty label is persisted in saves (not the params struct
 // itself), so a future balance pass tweaks the coefficient values while
 // preserving player intent. Saved as the *name*, loaded by *preset lookup*.
-enum Difficulty: String, Codable, CaseIterable {
+package enum Difficulty: String, Codable, CaseIterable {
     case apprentice
     case governor
     case volcker
 
-    var displayName: String {
+    package var displayName: String {
         GameConfigs.difficulty(self).displayName
     }
 
     // A one-line capsule suitable for the selector screen.
-    var tagline: String {
+    package var tagline: String {
         GameConfigs.difficulty(self).tagline
     }
 }
@@ -27,7 +27,7 @@ enum Difficulty: String, Codable, CaseIterable {
 extension ModelParameters {
     // Named preset accessor. Defaults on each field are the Governor settings;
     // the other presets diverge from those by overriding selected fields.
-    static func preset(_ d: Difficulty) -> ModelParameters {
+    package static func preset(_ d: Difficulty) -> ModelParameters {
         GameConfigs.difficulty(d).applied(to: .default)
     }
 }

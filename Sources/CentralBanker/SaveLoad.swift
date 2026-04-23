@@ -133,6 +133,6 @@ private func migrate(_ save: GameSave) -> GameSave {
 }
 
 // Resolved save path (for display purposes — "Saved to /abs/path/..." msg).
-func resolvedSavePath(_ path: String? = nil) -> String {
+package func resolvedSavePath(_ path: String? = nil) -> String {
     URL(fileURLWithPath: expandPath(path ?? defaultSavePath)).path
 }
