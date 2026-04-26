@@ -26,7 +26,32 @@ You play as the governor of the central bank. Your mandate is to contain inflati
   - `tutorial`
 - A headless balance harness for large seeded policy sweeps
 
-## Quick Start
+## Download and Play
+
+The initial public release is a macOS terminal build:
+
+- Release page: [CentralBanker 1.0.0](https://github.com/linirix/caribbeanbanker/releases/tag/v1.0.0)
+- Download: `CentralBanker-1.0.0-macos-arm64.zip`
+- Platform: macOS on Apple Silicon
+
+After unzipping the archive, run the launcher from Terminal:
+
+```bash
+cd ~/Downloads/CentralBanker-1.0.0-macos-arm64
+./run-centralbanker
+```
+
+Use `run-centralbanker` rather than launching the binary directly. The launcher points the game at the packaged `Config/` directory, so scenarios and tuning files load correctly outside the source repo.
+
+This release is unsigned and not notarized. If macOS blocks the downloaded binary, remove the quarantine flag from the unzipped folder and run the launcher again:
+
+```bash
+xattr -dr com.apple.quarantine ~/Downloads/CentralBanker-1.0.0-macos-arm64
+cd ~/Downloads/CentralBanker-1.0.0-macos-arm64
+./run-centralbanker
+```
+
+## Run from Source
 
 From the repo root:
 
@@ -98,6 +123,8 @@ The game also supports `preview` with hypothetical overrides, for example:
 preview rate 12.5
 preview reserve 15 controls 6
 ```
+
+For a fuller explanation of the game loop and policy tools, see [PLAYER_GUIDE.md](PLAYER_GUIDE.md).
 
 ## Scenario IDs
 
